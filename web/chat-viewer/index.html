@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>백업 결과 보기</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="room-pane" aria-label="채팅방 목록">
+        <header class="pane-header">
+          <div>
+            <h1>결과 보기</h1>
+            <p id="summary">읽는 중</p>
+          </div>
+          <button id="refreshButton" class="icon-button" type="button" title="새로고침" aria-label="새로고침">↻</button>
+        </header>
+
+        <div class="result-actions" aria-label="결과 화면 빠른 행동">
+          <a class="result-action primary" href="/backup#wechat" target="_top">1번 위챗 백업</a>
+          <button class="result-action" type="button" data-quick-platform="wechat">위챗 결과</button>
+          <a class="result-action" href="/backup#kakao" target="_top">카카오톡 백업</a>
+        </div>
+
+        <section id="resultGuide" class="result-guide" aria-label="결과 상태 안내">
+          <strong>결과 해석</strong>
+          <span>정상은 읽을 수 있는 백업입니다. 확인 필요는 실패가 아니라 발신자, 글자, 원본만 대조하면 된다는 뜻입니다.</span>
+        </section>
+
+        <label class="search-box">
+          <span>검색</span>
+          <input id="roomSearch" type="search" autocomplete="off" placeholder="방 / 상태">
+        </label>
+
+        <div class="segmented" role="tablist" aria-label="플랫폼 필터">
+          <button class="segment active" type="button" data-platform="all">전체</button>
+          <button class="segment" type="button" data-platform="kakao">카카오톡</button>
+          <button class="segment" type="button" data-platform="wechat">위챗</button>
+          <button class="segment" type="button" data-platform="discord" hidden>디스코드</button>
+          <button class="segment" type="button" data-status="review">확인 필요</button>
+        </div>
+
+        <div id="roomList" class="room-list" role="list"></div>
+      </aside>
+
+      <main class="chat-pane" aria-label="대화 내용">
+        <header class="chat-header">
+          <div class="room-title-block">
+            <h2 id="roomTitle">백업 결과를 선택하세요</h2>
+            <div id="roomMeta" class="room-meta"></div>
+          </div>
+          <div class="chat-tools">
+            <label class="search-box message-search">
+              <span>검색</span>
+              <input id="messageSearch" type="search" autocomplete="off" placeholder="메시지 / 사람">
+            </label>
+            <div class="export-actions" aria-label="결과 저장">
+              <button id="exportAllCsvButton" type="button" disabled>전체 표 파일 저장</button>
+              <button id="exportAllTextButton" type="button" disabled>전체 텍스트 저장</button>
+              <button id="exportCsvButton" type="button" disabled>표 파일 저장</button>
+              <button id="exportTextButton" type="button" disabled>텍스트 저장</button>
+              <span class="export-scope-hint">전체 저장은 현재 왼쪽 목록 기준입니다. 검색이나 필터를 바꾸면 저장 범위도 바뀝니다.</span>
+            </div>
+            <a id="sourceImageLink" class="source-link hidden" href="#" target="_blank" rel="noreferrer">원본 캡처</a>
+          </div>
+        </header>
+
+        <section id="auditStrip" class="audit-strip" aria-label="검수 지표"></section>
+        <section id="messageList" class="message-list" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

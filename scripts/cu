@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# 카카오톡/위챗 백업 공개 패키지용 보조 실행 파일입니다.
+# 일반 사용자는 이 파일을 직접 실행하지 않고 1_백업_시작.bat를 더블클릭합니다.
+set -euo pipefail
+
+SELF_WSL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+. "$SELF_WSL/lib/path_config.sh"
+load_computer_use_path_config "$SELF_WSL"
+
+usage() {
+  cat <<'EOF'
+카카오톡/위챗 백업 보조 실행 파일
+
+일반 사용자는 압축을 푼 폴더의 1_백업_시작.bat를 더블클릭하세요.
+이 파일은 Windows Node.js를 사용할 수 없고 WSL 대체 실행이 필요한 경우에만 내부적으로 사용됩니다.
+
+지원 항목:
+  cu gui
+  cu doctor
+  cu wechat run|batch|audit|db|validate-db|reaudit|review-queue
+  cu kakao chat|chat-batch|chat-audit|openchat|audit|view
+  cu chat-view
+  cu chat-audit
+EOF
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  gui)
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$CU_REPO_ROOT_WIN\\scripts\\start_console.ps1"
+    ;;
+  doctor)
+    node "$SELF_WSL/doctor.mjs" "$@"
+    ;;
+  chat-view|chatviewer)
+    node "$SELF_WSL/chat_artifact_viewer_server.mjs" "$@"
+    ;;
+  chat-audit|chataudit)
+    node "$SELF_WSL/chat_artifact_quality_audit.mjs" "$@"
+    ;;
+  wechat|wechat-scrape)
+    sub="${1:-run}"
+    shift || true
+    case "$sub" in
+      run|"")
+        bash "$SELF_WSL/wechat_scrape.sh" run "$@"
+        ;;
+      batch)
+        bash "$SELF_WSL/wechat_batch.sh" "$@"
+        ;;
+      audit)
+        node "$SELF_WSL/wechat_audit.mjs" "$@"
+        ;;
+      db)
+        node "$SELF_WSL/wechat_db_import.mjs" "$@"
+        ;;
+      validate-db|db-validate)
+        node "$SELF_WSL/wechat_db_validate.mjs" "$@"
+        ;;
+      reaudit)
+        node "$SELF_WSL/wechat_batch_reaudit.mjs" "$@"
+        ;;
+      review-queue)
+        node "$SELF_WSL/wechat_review_queue.mjs" "$@"
+        ;;
+      *)
+        echo "지원하지 않는 위챗 보조 기능입니다: $sub" >&2
+        echo "기본 백업은 1_백업_시작.bat로 열린 웹 화면에서 진행하세요." >&2
+        exit 2
+        ;;
+    esac
+    ;;
+  kakao|kakaotalk)
+    sub="${1:-chat}"
+    shift || true
+    case "$sub" in
+      chat|regular)
+        node "$SELF_WSL/kakao_regular_chat.mjs" chat "$@"
+        ;;
+      chat-batch)
+        node "$SELF_WSL/kakao_regular_chat.mjs" chat-batch "$@"
+        ;;
+      chat-audit|regular-audit)
+        node "$SELF_WSL/kakao_regular_chat.mjs" chat-audit "$@"
+        ;;
+      openchat|open-chat)
+        bash "$SELF_WSL/kakao_openchat_scrape.sh" "$@"
+        ;;
+      audit)
+        node "$SELF_WSL/kakao_openchat_audit.mjs" "$@"
+        ;;
+      view|viewer)
+        if [ -n "${1:-}" ] && [[ "${1:-}" != --* ]]; then
+          d="$1"
+          shift
+          node "$SELF_WSL/chat_artifact_viewer_server.mjs" --source "$d" "$@"
+        else
+          node "$SELF_WSL/chat_artifact_viewer_server.mjs" "$@"
+        fi
+        ;;
+      *)
+        echo "지원하지 않는 카카오톡 보조 기능입니다: $sub" >&2
+        echo "기본 백업은 1_백업_시작.bat로 열린 웹 화면에서 진행하세요." >&2
+        exit 2
+        ;;
+    esac
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    echo "지원하지 않는 보조 기능입니다: $cmd" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

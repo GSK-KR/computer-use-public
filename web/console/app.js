@@ -2010,6 +2010,21 @@ async function backupView() {
     if (missing.length) return '준비 확인';
     return `${platform} 전체 목록 확인 시작`;
   };
+  const fullBackupActionButtons = (() => {
+    if (fullBackupTarget === 'wechat') {
+      return `
+        <button data-batch-starter-wechat class="primary" type="button">${esc(batchGuideActionLabel('위챗', wechatBatchMissing))}</button>
+        <button data-full-backup-switch="kakao" type="button">카카오톡 통째 백업으로 전환</button>`;
+    }
+    if (fullBackupTarget === 'kakao') {
+      return `
+        <button data-batch-starter-kakao class="primary" type="button">${esc(batchGuideActionLabel('카카오톡', kakaoBatchMissing))}</button>
+        <button data-full-backup-switch="wechat" type="button">위챗 통째 백업으로 전환</button>`;
+    }
+    return `
+        <button data-batch-starter-wechat class="primary" type="button">${esc(batchGuideActionLabel('위챗', wechatBatchMissing))}</button>
+        <button data-batch-starter-kakao type="button">${esc(batchGuideActionLabel('카카오톡', kakaoBatchMissing))}</button>`;
+  })();
   const targetNotice = fullBackupTarget
     ? `<div class="notice focus-notice"><strong>${esc(targetLabel)} 통째 백업 위치입니다.</strong> ${esc(fullBackupTargetActionText)}</div>`
     : targetLabel
@@ -2121,8 +2136,7 @@ async function backupView() {
         <li><span>4</span><strong>끝 판정</strong><small>상한이나 확인 필요 방은 같은 카드에 표시됩니다.</small></li>
       </ol>
       <div class="full-backup-actions">
-        <button data-batch-starter-wechat class="${fullBackupTarget !== 'kakao' ? 'primary' : ''}" type="button">${esc(batchGuideActionLabel('위챗', wechatBatchMissing))}</button>
-        <button data-batch-starter-kakao class="${fullBackupTarget === 'kakao' ? 'primary' : ''}" type="button">${esc(batchGuideActionLabel('카카오톡', kakaoBatchMissing))}</button>
+        ${fullBackupActionButtons}
       </div>
     </section>`;
   const kakaoReadyText = '카카오톡 실행과 한국어 문자 인식이 확인됐습니다';
@@ -2392,6 +2406,10 @@ async function backupView() {
     const target = button.dataset.jumpBackup;
     if (target === 'chats') navigate('/chats');
     else navigate(`/backup#${target}`);
+  }));
+  view.querySelectorAll('[data-full-backup-switch]').forEach((button) => button.addEventListener('click', () => {
+    const target = button.dataset.fullBackupSwitch;
+    if (target === 'kakao' || target === 'wechat') navigate(`/backup#${target}-full`);
   }));
   const jumpToBackupTarget = (sectionSelector, focusSelector, message) => {
     view.querySelector(sectionSelector)?.scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -26,6 +26,12 @@ export function redactPath(value) {
   return text;
 }
 
+function friendlyRedactedPath(value) {
+  return String(value ?? '')
+    .replaceAll('$HOME', '내 사용자 폴더')
+    .replaceAll('<user>', '내이름');
+}
+
 function check(id, label, status, message, details = {}) {
   return { id, label, status, message, details };
 }
@@ -424,9 +430,9 @@ function formatCheckLine(item, label) {
 
 function formatFullDoctor(report, label) {
   const lines = [];
-  const statePath = report.paths.stateDirWin || report.paths.stateDir;
-  const shotsPath = report.paths.shotsDirWin || report.paths.shotsDir;
-  const runsPath = report.paths.runsDirWin || report.paths.runsDir;
+  const statePath = friendlyRedactedPath(report.paths.stateDirWin || report.paths.stateDir);
+  const shotsPath = friendlyRedactedPath(report.paths.shotsDirWin || report.paths.shotsDir);
+  const runsPath = friendlyRedactedPath(report.paths.runsDirWin || report.paths.runsDir);
   lines.push(`Computer-Use 준비 확인: ${label(report.status)} (정상 ${report.counts.pass}, 확인 ${report.counts.review}, 실패 ${report.counts.fail})`);
   lines.push(`저장 위치: 설정=${statePath} 백업=${shotsPath} 진행기록=${runsPath}`);
   for (const item of report.checks) {
@@ -543,8 +549,8 @@ export function formatDoctor(report, options = {}) {
   const optionalChecks = checks.filter((item) => !beginnerCheckIds.has(item.id));
   const optionalReady = optionalChecks.filter((item) => item.status === 'pass').length;
   const optionalNeeds = optionalChecks.filter((item) => item.status !== 'pass').length;
-  const shotsPath = report.paths.shotsDirWin || report.paths.shotsDir;
-  const runsPath = report.paths.runsDirWin || report.paths.runsDir;
+  const shotsPath = friendlyRedactedPath(report.paths.shotsDirWin || report.paths.shotsDir);
+  const runsPath = friendlyRedactedPath(report.paths.runsDirWin || report.paths.runsDir);
   const lines = [];
 
   lines.push(`Computer-Use 준비 확인: ${label(beginnerStatus)} (기본 항목 ${beginnerChecks.length - beginnerNeeds.length}/${beginnerChecks.length}개 준비)`);

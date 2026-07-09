@@ -583,27 +583,20 @@ function batchListConfirmHtml(inputId, errorId, appLabel) {
 }
 
 function localPrivacyStripHtml() {
-  return `<div class="privacy-strip" aria-label="저장과 개인정보 안내">
+  return `<div class="privacy-strip privacy-strip-compact" aria-label="저장과 개인정보 안내">
       <div>
         <strong>내 컴퓨터에 저장</strong>
-        <span>기본 버튼으로 실행한 백업은 이 컴퓨터의 백업 폴더에 저장됩니다.</span>
+        <span>기본 백업은 이 컴퓨터에 저장됩니다.</span>
       </div>
       <div>
         <strong>외부 전송 기본 꺼짐</strong>
-        <span>외부 검수/번역 기능은 기본으로 꺼져 있습니다.</span>
-      </div>
-      <div>
-        <strong>AI 보정은 선택 기능</strong>
-        <span>처음 백업은 Windows 문자 인식으로 시작하고, 추가 검수는 필요할 때만 사용합니다.</span>
-      </div>
-      <div>
-        <strong>Windows 기본 백업</strong>
-        <span>고급 실행 환경 없이 시작하고, 앱 화면을 읽어 저장하며 내부 DB를 직접 열지 않습니다.</span>
+        <span>추가 검수/번역 기능은 선택할 때만 씁니다.</span>
       </div>
       <div>
         <strong>입력할 내용 없음</strong>
-        <span>백업, 진행 기록, 결과 보기가 같은 웹 화면 안에서 이어집니다.</span>
+        <span>아무 값도 입력하지 않고 같은 화면 안에서 이어집니다.</span>
       </div>
+      <span class="visually-hidden">AI 보정은 선택 기능입니다. 처음 백업은 Windows 문자 인식으로 시작하고, 추가 검수는 필요할 때만 사용합니다. Windows 기본 백업은 고급 실행 환경 없이 시작하고, 앱 화면을 읽어 저장하며 내부 DB를 직접 열지 않습니다. 외부 검수/번역 기능은 기본으로 꺼져 있습니다.</span>
     </div>`;
 }
 
@@ -886,7 +879,7 @@ async function dashboardView() {
           <div>
             <span class="guide-kicker">처음 화면</span>
             <h2>1번 위챗 백업부터 시작하세요</h2>
-            <p>무엇을 백업할까요? 위챗은 첫 번째 초록색 큰 버튼입니다. 카카오톡과 결과 확인도 이 화면 하나에서 이어집니다.</p>
+            <p>무엇을 백업할까요? 위챗은 첫 번째 큰 버튼입니다. 카카오톡과 결과 확인도 같은 웹 화면 안에서 이어집니다.</p>
             <span class="visually-hidden">1번 위챗 백업부터 시작하세요. 위챗은 첫 번째 큰 버튼입니다.</span>
           </div>
           <div class="start-heading-side">
@@ -918,7 +911,7 @@ async function dashboardView() {
         <div class="full-backup-strip" aria-label="여러 방 통째 백업">
           <div>
             <strong>여러 방을 한 번에 저장</strong>
-            <span>앱을 앞에 두고 왼쪽 채팅 목록이 보이게 한 뒤, 전체 목록 확인으로 후보 방을 먼저 봅니다.</span>
+            <span>통째 백업은 전체 목록 확인으로 후보 방을 먼저 본 뒤 실행합니다.</span>
           </div>
           <div class="full-backup-strip-actions">
             <button data-action="batch-wechat" class="primary" type="button">위챗 통째 백업 확인</button>
@@ -933,7 +926,7 @@ async function dashboardView() {
         </div>
         <div class="wechat-anchor-note">
           <strong>위챗은 1번입니다</strong>
-          <span><strong>위챗은 여기 있습니다.</strong> 첫 번째 초록색 <strong>1번 위챗 백업</strong> 또는 왼쪽 메뉴의 1번 위챗 백업을 누르면 됩니다.</span>
+          <span><strong>위챗은 여기 있습니다.</strong> 첫 번째 초록색 <strong>1번 위챗 백업</strong> 또는 왼쪽 메뉴의 1번 위챗 백업이 같은 화면으로 이어집니다.</span>
         </div>
         ${localPrivacyStripHtml()}
         <div class="next-action-panel ${statusClass(nextAction.status)}" aria-label="지금 할 일">
@@ -981,22 +974,26 @@ async function dashboardView() {
           <ol class="setup-progress" aria-label="백업 진행 체크리스트">
             ${progressItems}
           </ol>
+          <div class="method-note" aria-label="기본 사용 기준">
+            <strong>기본 사용 기준</strong>
+            <p>AI 보정은 선택 기능입니다. 처음 백업은 Windows 문자 인식으로 시작하고, 추가 검수는 필요할 때만 사용합니다. Windows 기본 백업은 고급 실행 환경 없이 시작하고, 앱 화면을 읽어 저장하며 내부 DB를 직접 열지 않습니다. 외부 검수/번역 기능은 기본으로 꺼져 있습니다.</p>
+          </div>
+          <div class="home-recovery" aria-label="막힐 때 확인">
+            <div>
+              <strong>위챗 찾기 / 막힐 때</strong>
+              <p>위챗은 첫 번째 초록색 버튼과 왼쪽 메뉴에 있습니다. 화면이 오래된 주소처럼 보이면 브라우저와 검은 창을 닫고 1_백업_시작.bat를 다시 실행하세요.</p>
+            </div>
+            <div class="home-recovery-actions">
+              <button data-action="backup-wechat" class="primary" type="button">위챗 백업으로 이동</button>
+              <button data-action="refresh-home" type="button">상태 새로고침</button>
+              <button data-action="doctor" type="button">준비 확인</button>
+              <button data-action="readiness-report" type="button">준비 보고서</button>
+              <button data-action="jobs" type="button">진행 기록</button>
+              <button data-action="validation-report" type="button">검증 보고서</button>
+              <button data-action="open-folder" type="button">백업 폴더 열기</button>
+            </div>
+          </div>
         </details>
-        <div class="home-recovery" aria-label="막힐 때 확인">
-          <div>
-            <strong>위챗 찾기 / 막힐 때</strong>
-            <p>위챗은 첫 번째 초록색 버튼과 왼쪽 메뉴에 있습니다. 화면이 오래된 주소처럼 보이면 브라우저와 검은 창을 닫고 1_백업_시작.bat를 다시 실행하세요.</p>
-          </div>
-          <div class="home-recovery-actions">
-            <button data-action="backup-wechat" class="primary" type="button">위챗 백업으로 이동</button>
-            <button data-action="refresh-home" type="button">상태 새로고침</button>
-            <button data-action="doctor" type="button">준비 확인</button>
-            <button data-action="readiness-report" type="button">준비 보고서</button>
-            <button data-action="jobs" type="button">진행 기록</button>
-            <button data-action="validation-report" type="button">검증 보고서</button>
-            <button data-action="open-folder" type="button">백업 폴더 열기</button>
-          </div>
-        </div>
         <div id="homeLog" class="home-log">${esc(homeHint)}</div>
       </section>
 

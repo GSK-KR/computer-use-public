@@ -603,6 +603,11 @@ button.danger:hover {
   padding: 10px;
 }
 
+.privacy-strip.privacy-strip-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 9px 10px;
+}
+
 .privacy-strip div {
   min-width: 0;
   display: grid;
@@ -620,6 +625,11 @@ button.danger:hover {
   font-size: 12px;
   font-weight: 550;
   overflow-wrap: anywhere;
+}
+
+.privacy-strip.privacy-strip-compact span {
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .full-backup-strip {
@@ -703,6 +713,23 @@ button.danger:hover {
   font-size: 12px;
   line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+.method-note {
+  margin: 0 12px 12px;
+  border: 1px solid #d8def3;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.method-note strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.method-note p {
+  font-size: 12px;
 }
 
 .next-action-panel {
@@ -919,6 +946,10 @@ button.danger:hover {
   border-radius: 8px;
   background: #f4f6ff;
   padding: 12px;
+}
+
+.home-detail-drawer .home-recovery {
+  margin: 0 12px 12px;
 }
 
 .home-recovery strong {
@@ -2846,7 +2877,8 @@ textarea {
   .home-recovery-actions { justify-content: flex-start; }
   .choice-strip { grid-template-columns: 1fr; }
   .help-columns { grid-template-columns: 1fr; }
-  .privacy-strip { grid-template-columns: 1fr; }
+  .privacy-strip,
+  .privacy-strip.privacy-strip-compact { grid-template-columns: 1fr; }
   .full-backup-strip { grid-template-columns: 1fr; }
   .full-backup-mini-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .full-backup-strip-actions { justify-content: flex-start; }

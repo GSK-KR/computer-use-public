@@ -437,7 +437,7 @@ function inspectPublicPackage(checks) {
     && firstGuide.includes('1_백업_시작.bat를 더블클릭')
     && firstGuide.includes('4_준비_보고서.bat와 4_검증_보고서.bat는 지원용 보고서를 만들 때만 사용합니다. 처음 백업 시작 파일이 아닙니다')
     && firstGuide.includes('브라우저를 열기 어려운 상태에서 준비 상태만 보내야 하면 4_준비_보고서.bat를 실행합니다')
-    && firstGuide.includes('첫 화면의 위챗 찾기 / 막힐 때 영역에서 검증 보고서를 누르거나, 진행 기록에서 검증 보고서를 누릅니다')
+    && firstGuide.includes('첫 화면의 막힐 때만 자세히 보기 안에 있는 위챗 찾기 / 막힐 때 영역에서 검증 보고서를 누르거나, 진행 기록에서 검증 보고서를 누릅니다')
     && firstGuide.includes('브라우저를 찾기 어려울 때만 4_검증_보고서.bat를 실행합니다')
     && firstGuide.includes('1번 위챗 백업부터 시작하세요')
     && firstGuide.includes('아무 값도 입력하지 않습니다')

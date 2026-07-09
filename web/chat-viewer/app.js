@@ -772,12 +772,12 @@ function renderRooms() {
         <strong>아직 백업 결과가 없습니다</strong>
         <span>실패가 아니라 아직 이 화면에서 읽을 백업 파일이 없다는 뜻입니다.</span>
         <ol class="empty-next-steps">
-          <li>처음이면 1번 위챗 백업부터 시작합니다.</li>
-          <li>카카오톡만 쓰면 카카오톡 백업을 누릅니다.</li>
+          <li>처음이면 위챗 백업 또는 카카오톡 백업을 실행합니다.</li>
+          <li>앱에서 백업할 방을 먼저 열어 둡니다.</li>
           <li>이미 실행했다면 결과 새로고침, 백업 폴더 열기, 진행 기록 순서로 봅니다.</li>
         </ol>
         <div class="empty-actions">
-          <a class="action-link primary" href="${esc(consoleUrl('/backup#wechat'))}" target="_top">1번 위챗 백업</a>
+          <a class="action-link primary" href="${esc(consoleUrl('/backup#wechat'))}" target="_top">위챗 백업</a>
           <a class="action-link" href="${esc(consoleUrl('/backup#kakao'))}" target="_top">카카오톡 백업</a>
           <button class="action-link" type="button" data-empty-refresh>결과 새로고침</button>
           <button class="action-link" type="button" data-empty-folder>백업 폴더 열기</button>
@@ -864,14 +864,14 @@ function renderMessages() {
       ? '<div class="empty-state">왼쪽에서 채팅방을 고르세요.</div>'
       : `<div class="empty-state rich">
           <strong>아직 백업 결과가 없습니다</strong>
-          <span>처음이면 지금 열린 위챗 방 백업부터 시작하는 것이 가장 쉽습니다.</span>
+          <span>먼저 위챗 또는 카카오톡에서 백업할 방을 열고 백업을 실행하세요.</span>
           <ol class="empty-next-steps">
-            <li>위챗 앱에서 백업할 방을 열어 둡니다.</li>
-            <li>1번 위챗 백업을 누르고 방 선택 완료 표시를 합니다.</li>
+            <li>위챗 또는 카카오톡에서 백업할 방을 열어 둡니다.</li>
+            <li>백업 화면에서 방 선택 완료 표시를 하고 백업을 누릅니다.</li>
             <li>이미 백업했다면 결과 새로고침, 백업 폴더 열기, 진행 기록 순서로 봅니다.</li>
           </ol>
           <div class="empty-actions">
-            <a class="action-link primary" href="${esc(consoleUrl('/backup#wechat'))}" target="_top">1번 위챗 백업</a>
+            <a class="action-link primary" href="${esc(consoleUrl('/backup#wechat'))}" target="_top">위챗 백업</a>
             <a class="action-link" href="${esc(consoleUrl('/backup#kakao'))}" target="_top">카카오톡 백업</a>
             <button class="action-link" type="button" data-empty-refresh>결과 새로고침</button>
             <button class="action-link" type="button" data-empty-folder>백업 폴더 열기</button>
@@ -919,12 +919,12 @@ async function loadAll() {
       <span>값을 찾거나 입력하지 말고 아래 버튼으로 다시 확인하세요.</span>
       <ol class="empty-next-steps">
         <li>결과 새로고침을 누릅니다.</li>
-        <li>계속 비어 있으면 1번 위챗 백업 또는 카카오톡 백업을 다시 실행합니다.</li>
+        <li>계속 비어 있으면 위챗 백업 또는 카카오톡 백업을 다시 실행합니다.</li>
         <li>이미 실행했다면 백업 폴더 열기 또는 진행 기록에서 마지막 안내를 확인합니다.</li>
       </ol>
       <div class="empty-actions">
         <button class="action-link primary" type="button" data-empty-refresh>결과 새로고침</button>
-        <a class="action-link" href="${esc(consoleUrl('/backup#wechat'))}" target="_top">1번 위챗 백업</a>
+        <a class="action-link" href="${esc(consoleUrl('/backup#wechat'))}" target="_top">위챗 백업</a>
         <a class="action-link" href="${esc(consoleUrl('/backup#kakao'))}" target="_top">카카오톡 백업</a>
         <button class="action-link" type="button" data-empty-folder>백업 폴더 열기</button>
         <a class="action-link" href="${esc(consoleUrl('/jobs'))}" target="_top">진행 기록</a>

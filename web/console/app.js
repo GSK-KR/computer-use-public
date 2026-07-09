@@ -742,9 +742,9 @@ async function dashboardView() {
       return {
         status: 'ready',
         title: '지금 할 일',
-        text: '준비 확인을 기다리지 않아도 됩니다. 위챗 앱에서 방을 선택했으면 1번 위챗 백업으로 들어가세요.',
+        text: '앱에서 방을 선택한 뒤 백업을 시작하세요.',
         actions: `
-          <button data-action="backup-wechat" class="primary" type="button">1번 위챗 백업</button>
+          <button data-action="backup-wechat" class="primary" type="button">위챗 백업</button>
           <button data-action="open-wechat" type="button">위챗 열기</button>
           <button data-action="chats" type="button">결과 보기</button>`,
       };
@@ -755,7 +755,7 @@ async function dashboardView() {
         title: '지금 할 일',
         text: '위챗 실행과 중국어 문자 인식이 확인됐습니다. 위챗에서 백업할 방을 선택한 뒤 백업을 시작하세요.',
         actions: `
-          <button data-action="backup-wechat" class="primary" type="button">1번 위챗 백업</button>
+          <button data-action="backup-wechat" class="primary" type="button">위챗 백업</button>
           <button data-action="chats" type="button">결과 보기</button>
           <button data-action="backup-kakao" type="button">카카오톡 백업</button>`,
       };
@@ -770,10 +770,10 @@ async function dashboardView() {
       return {
         status: 'partial',
         title: '지금 할 일',
-        text: `위챗은 사라진 것이 아닙니다. ${wechatBlockText} 카카오톡은 바로 백업할 수 있습니다.`,
+        text: `${wechatBlockText} 카카오톡은 바로 백업할 수 있습니다.`,
         actions: `
           <button data-action="${wechatFixAction}" class="primary" type="button">${wechatFixLabel}</button>
-          <button data-action="backup-wechat" type="button">1번 위챗 백업</button>
+          <button data-action="backup-wechat" type="button">위챗 백업</button>
           <button data-action="backup-kakao" type="button">카카오톡 백업</button>`,
       };
     }
@@ -784,7 +784,7 @@ async function dashboardView() {
         text: '위챗 백업에는 중국어 화면 글자 읽기가 필요합니다. 설정을 열어 중국어(간체, 중국) 또는 중국어(번체, 대만/홍콩) 중 하나를 추가하세요.',
         actions: `
           <button data-action="install-ocr-zh" class="primary" type="button">중국어 문자 인식 설치</button>
-          <button data-action="backup-wechat" type="button">1번 위챗 백업</button>
+          <button data-action="backup-wechat" type="button">위챗 백업</button>
           <button data-action="doctor" type="button">준비 확인</button>`,
       };
     }
@@ -802,9 +802,9 @@ async function dashboardView() {
     return {
       status: coreBackupReady ? 'ready' : 'review',
       title: '지금 할 일',
-      text: '앱에서 백업할 방을 선택한 뒤 1번 위챗 백업 또는 카카오톡 백업을 시작하세요.',
+      text: '앱에서 백업할 방을 선택한 뒤 위챗 백업 또는 카카오톡 백업을 시작하세요.',
       actions: `
-        <button data-action="backup-wechat" class="primary" type="button">1번 위챗 백업</button>
+        <button data-action="backup-wechat" class="primary" type="button">위챗 백업</button>
         <button data-action="backup-kakao" type="button">카카오톡 백업</button>
         <button data-action="refresh-home" type="button">상태 새로고침</button>`,
     };
@@ -878,27 +878,27 @@ async function dashboardView() {
         <div class="start-heading simple-start-heading">
           <div>
             <span class="guide-kicker">처음 화면</span>
-            <h2>1번 위챗 백업부터 시작하세요</h2>
-            <p>무엇을 백업할까요? 위챗은 첫 번째 큰 버튼입니다. 카카오톡과 결과 확인도 같은 웹 화면 안에서 이어집니다.</p>
-            <span class="visually-hidden">1번 위챗 백업부터 시작하세요. 위챗은 첫 번째 큰 버튼입니다.</span>
+            <h2>백업할 앱을 선택하세요</h2>
+            <p>위챗, 카카오톡, 결과 보기 중 필요한 작업만 누르면 됩니다.</p>
+            <span class="visually-hidden">백업할 앱을 선택하세요.</span>
           </div>
           <div class="start-heading-side">
             <span class="badge ${statusClass(doctorBadgeClass)}">${esc(doctorBadgeText)}</span>
             <div class="start-shortcuts" aria-label="빠른 시작">
-              <button data-action="backup-wechat" class="primary" type="button">1번 위챗 바로 시작</button>
-              <button data-action="backup-kakao" type="button">카카오톡 바로 시작</button>
+              <button data-action="backup-wechat" class="primary" type="button">위챗 백업</button>
+              <button data-action="backup-kakao" type="button">카카오톡 백업</button>
               <button data-action="chats" type="button">결과 보기</button>
             </div>
           </div>
         </div>
         <div class="choice-strip" aria-label="백업 선택">
           <button data-action="backup-wechat" class="choice-action primary-choice" type="button">
-            <span class="choice-kicker">1번</span>
+            <span class="choice-kicker">위챗</span>
             <strong>위챗 백업</strong>
             <small>지금 열린 방부터 시작</small>
           </button>
           <button data-action="backup-kakao" class="choice-action" type="button">
-            <span class="choice-kicker">2번</span>
+            <span class="choice-kicker">카카오톡</span>
             <strong>카카오톡 백업</strong>
             <small>열린 채팅방부터 시작</small>
           </button>
@@ -924,10 +924,6 @@ async function dashboardView() {
             <li><span>4</span><strong>결과 보기와 전체 저장</strong></li>
           </ol>
         </div>
-        <div class="wechat-anchor-note">
-          <strong>위챗은 1번입니다</strong>
-          <span><strong>위챗은 여기 있습니다.</strong> 첫 번째 초록색 <strong>1번 위챗 백업</strong> 또는 왼쪽 메뉴의 1번 위챗 백업이 같은 화면으로 이어집니다.</span>
-        </div>
         ${localPrivacyStripHtml()}
         <div class="next-action-panel ${statusClass(nextAction.status)}" aria-label="지금 할 일">
           <div>
@@ -947,7 +943,7 @@ async function dashboardView() {
           </summary>
           <div class="platform-grid">
             <section class="platform-card wechat-card">
-              <span class="badge ${statusClass(wechatStatus.status)}">1번 ${esc(wechatStatus.label)}</span>
+              <span class="badge ${statusClass(wechatStatus.status)}">${esc(wechatStatus.label)}</span>
               <strong>위챗 백업</strong>
               <small>지금 열린 방을 먼저 백업하고, 필요하면 통째 백업(왼쪽 목록 전체 순회)을 이어서 실행합니다</small>
               <div class="card-actions">
@@ -980,8 +976,8 @@ async function dashboardView() {
           </div>
           <div class="home-recovery" aria-label="막힐 때 확인">
             <div>
-              <strong>위챗 찾기 / 막힐 때</strong>
-              <p>위챗은 첫 번째 초록색 버튼과 왼쪽 메뉴에 있습니다. 화면이 오래된 주소처럼 보이면 브라우저와 검은 창을 닫고 1_백업_시작.bat를 다시 실행하세요.</p>
+              <strong>막힐 때</strong>
+              <p>앱을 열었는데도 백업이 안 되면 상태 새로고침과 준비 확인을 먼저 누르세요. 화면이 오래된 주소처럼 보이면 브라우저와 검은 창을 닫고 1_백업_시작.bat를 다시 실행하세요.</p>
             </div>
             <div class="home-recovery-actions">
               <button data-action="backup-wechat" class="primary" type="button">위챗 백업으로 이동</button>
@@ -2141,14 +2137,14 @@ async function backupView() {
     </section>`;
   const kakaoReadyText = '카카오톡 실행과 한국어 문자 인식이 확인됐습니다';
   const wechatReadyText = '위챗 실행과 중국어 문자 인식이 확인됐습니다';
-  setChrome('위챗/카카오톡 백업', '위챗을 1번으로, 카카오톡과 결과 확인을 같은 화면에서 진행합니다');
+  setChrome('위챗/카카오톡 백업', '백업과 결과 확인을 같은 화면에서 진행합니다');
   view.innerHTML = `
     <div class="grid">
       ${firstBackupGuideHtml}
 
       <section class="panel span-12 backup-head">
         <div class="toolbar">
-          <strong>1번 위챗 / 2번 카카오톡 백업</strong>
+          <strong>위챗 / 카카오톡 백업</strong>
           ${doctorBadge}
           <button id="backupDoctor" type="button">준비 확인</button>
           <button id="backupJobs" type="button">진행 기록</button>
@@ -2159,8 +2155,8 @@ async function backupView() {
         ${notice}
         ${fallbackNotice}
         <div class="backup-switcher" aria-label="백업 종류 바로가기">
-          <button data-jump-backup="wechat" class="${backupTarget === 'wechat' ? 'primary' : ''}" type="button">1번 위챗 바로 시작</button>
-          <button data-jump-backup="kakao" class="${backupTarget === 'kakao' ? 'primary' : ''}" type="button">카카오톡 바로 시작</button>
+          <button data-jump-backup="wechat" class="${backupTarget === 'wechat' ? 'primary' : ''}" type="button">위챗 백업</button>
+          <button data-jump-backup="kakao" class="${backupTarget === 'kakao' ? 'primary' : ''}" type="button">카카오톡 백업</button>
           <button data-jump-backup="chats" type="button">결과 보기</button>
         </div>
         <div class="step-strip" aria-label="백업 진행 순서">
@@ -3567,14 +3563,10 @@ async function render() {
     view.innerHTML = `<section class="panel auth-panel">
       <h2>백업 화면을 새로 열어 주세요</h2>
       <p>지금 열린 화면은 오래된 주소입니다. 따로 입력할 내용이 없습니다. 아무 값도 입력하지 않습니다. 영어 오류 화면이 보여도 값을 찾지 말고, 브라우저와 검은 창을 닫은 뒤 압축을 푼 폴더의 <strong>1_백업_시작.bat</strong>를 다시 더블클릭하세요. Windows가 파일 확장자를 숨기면 <strong>1_백업_시작</strong>으로 보일 수 있습니다. 보조 실행 파일은 <strong>시작하기.bat</strong>입니다.</p>
-      <div class="auth-wechat-note">
-        <strong>위챗은 1번입니다</strong>
-        <span>위챗은 사라진 것이 아닙니다. 새로 열린 첫 화면에서 첫 번째 초록색 버튼, 상단 버튼, 왼쪽 메뉴의 <strong>1번 위챗 백업</strong>을 누르면 됩니다. 결과 보기도 같은 웹 화면 안에 있습니다.</span>
-      </div>
       <ol class="auth-steps">
         <li><span>1</span><strong>브라우저와 검은 창 닫기</strong></li>
         <li><span>2</span><strong>1_백업_시작.bat 더블클릭</strong></li>
-        <li><span>3</span><strong>위챗 백업 버튼 확인</strong></li>
+        <li><span>3</span><strong>위챗 백업 또는 카카오톡 백업 선택</strong></li>
       </ol>
       <div class="auth-actions">
         <button id="localAuth" class="primary" type="button">백업 화면 다시 열기</button>

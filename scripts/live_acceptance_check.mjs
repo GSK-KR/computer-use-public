@@ -305,14 +305,14 @@ function nextStepsFor(checks, summary) {
   const hasKakaoResult = Number(summary.kakaoRooms || 0) >= Number(options.minKakaoRooms || 0);
   const hasWechatResult = Number(summary.wechatRooms || 0) >= Number(options.minWechatRooms || 0);
   if (!hasWechatResult && wechatOcrReady) {
-    add('위챗 앱에서 백업할 방을 선택한 뒤 웹 화면의 1번 위챗 백업에서 지금 열린 위챗 방 백업을 실행하세요.');
+    add('위챗 앱에서 백업할 방을 선택한 뒤 웹 화면의 위챗 백업에서 지금 열린 위챗 방 백업을 실행하세요.');
   }
   if (!hasKakaoResult && kakaoOcrReady) {
     add('카카오톡 앱에서 백업할 방을 연 뒤 웹 화면의 카카오톡 백업에서 열린 채팅방 백업을 실행하세요.');
   }
 
   if (hasWechatResult && wechatOcrReady && checkStatus(checks, 'latest_wechat_job') !== 'pass') {
-    add('위챗 결과는 보이지만 이번 웹 실행 성공 기록이 없습니다. 새 Windows PC 검증이면 1번 위챗 백업을 한 번 더 실행하세요.');
+    add('위챗 결과는 보이지만 이번 웹 실행 성공 기록이 없습니다. 새 Windows PC 검증이면 위챗 백업을 한 번 더 실행하세요.');
   }
   if (hasKakaoResult && kakaoOcrReady && checkStatus(checks, 'latest_kakao_job') !== 'pass') {
     add('카카오톡 결과는 보이지만 이번 웹 실행 성공 기록이 없습니다. 새 Windows PC 검증이면 카카오톡 열린 채팅방 백업을 한 번 더 실행하세요.');
@@ -439,7 +439,7 @@ function inspectPublicPackage(checks) {
     && firstGuide.includes('브라우저를 열기 어려운 상태에서 준비 상태만 보내야 하면 4_준비_보고서.bat를 실행합니다')
     && firstGuide.includes('첫 화면의 막힐 때만 자세히 보기 안에 있는 위챗 찾기 / 막힐 때 영역에서 검증 보고서를 누르거나, 진행 기록에서 검증 보고서를 누릅니다')
     && firstGuide.includes('브라우저를 찾기 어려울 때만 4_검증_보고서.bat를 실행합니다')
-    && firstGuide.includes('1번 위챗 백업부터 시작하세요')
+    && firstGuide.includes('첫 화면에서 위챗 백업, 카카오톡 백업, 결과 보기 중 필요한 작업을 고릅니다')
     && firstGuide.includes('아무 값도 입력하지 않습니다')
     && readme.includes('Windows에서 더블클릭')
     && readme.includes('computer-use-public.zip')
@@ -451,7 +451,7 @@ function inspectPublicPackage(checks) {
     && troubleshootingGuide.includes('카카오톡/위챗 백업 문제 확인')
     && troubleshootingGuide.includes('대부분은 아래 3가지만 하면 해결됩니다')
     && troubleshootingGuide.includes('아무 값도 입력하지 않습니다')
-    && troubleshootingGuide.includes('위챗은 사라진 것이 아닙니다')
+    && troubleshootingGuide.includes('위챗 백업은 첫 화면, 왼쪽 메뉴, 결과 화면의 위챗 백업 버튼에서 들어갑니다')
     && troubleshootingGuide.includes('방 선택 완료, 앱 창 앞에 둠 체크박스')
     && !/START_HERE\.txt|0_처음_읽기\.txt|처음_읽기\.txt|PUBLIC_RELEASE_NOTES|Computer-Use-Web\.bat/u.test(`${firstGuide}\n${readme}`);
   addCheck(
@@ -464,9 +464,9 @@ function inspectPublicPackage(checks) {
 
   const initialDashboardRequired = [
     'loading-dashboard',
-    '1번 위챗 백업부터 시작하세요',
-    '1번 위챗 바로 시작',
-    '카카오톡 바로 시작',
+    '백업할 앱을 선택하세요',
+    '위챗 백업',
+    '카카오톡 백업',
     '위챗 통째 백업 확인',
     '카카오톡 통째 백업 확인',
     '통째 백업 순서',
@@ -474,7 +474,6 @@ function inspectPublicPackage(checks) {
     '후보 확인',
     '목록 백업 실행',
     '결과 보기와 전체 저장',
-    '위챗은 1번입니다',
     '내 컴퓨터에 저장',
     '외부 전송 기본 꺼짐',
     'Windows 기본 백업',
@@ -730,14 +729,14 @@ async function run() {
     const required = [
       '위챗/카카오톡 백업',
       'quickWechatBtn',
-      '1번 위챗 바로 시작',
-      '카카오톡 바로 시작',
+      '위챗 백업',
+      '카카오톡 백업',
       '결과 보기',
       'loading-dashboard',
       '위챗 통째 백업 확인',
       '카카오톡 통째 백업 확인',
       '앱을 앞에 두고 왼쪽 채팅 목록이 보이게 한 뒤',
-      '위챗은 1번입니다',
+      '백업할 앱을 선택하세요',
       '내 컴퓨터에 저장',
       '외부 전송 기본 꺼짐',
       'Windows 기본 백업',

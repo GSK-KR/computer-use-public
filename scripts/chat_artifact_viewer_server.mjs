@@ -52,10 +52,24 @@ function packageInstanceHash(root) {
   return createHash('sha256').update(summary).digest('hex').slice(0, 16);
 }
 
+function normalizeConsoleUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    url.hash = '';
+    return url.href.replace(/\/+$/u, '');
+  } catch {
+    return '';
+  }
+}
+
 const options = {
   host: process.env.CHAT_VIEW_HOST || '127.0.0.1',
   port: Number(process.env.CHAT_VIEW_PORT || 8766),
   staticDir: join(rootDir, 'web', 'chat-viewer'),
+  consoleUrl: normalizeConsoleUrl(process.env.CU_CONSOLE_URL || process.env.CHAT_VIEW_CONSOLE_URL || ''),
   kakaoDirs: [],
   kakaoOpenchatDirs: [],
   discordDirs: [],
@@ -86,6 +100,8 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (cur.startsWith('--host=')) options.host = cur.slice('--host='.length);
   else if (cur === '--port') options.port = Number(process.argv[++i]);
   else if (cur.startsWith('--port=')) options.port = Number(cur.slice('--port='.length));
+  else if (cur === '--console-url') options.consoleUrl = normalizeConsoleUrl(process.argv[++i]);
+  else if (cur.startsWith('--console-url=')) options.consoleUrl = normalizeConsoleUrl(cur.slice('--console-url='.length));
   else if (cur === '--static-dir') options.staticDir = process.argv[++i];
   else if (cur.startsWith('--static-dir=')) options.staticDir = cur.slice('--static-dir='.length);
   else if (cur === '--no-auto') options.auto = false;
@@ -1446,6 +1462,103 @@ function sendError(res, status, message) {
   sendJson(res, status, { error: message });
 }
 
+function consoleUrlFromStateFile() {
+  const candidates = [
+    pathConfig.stateDirWsl ? join(pathConfig.stateDirWsl, 'console_url.txt') : '',
+    pathConfig.stateDirWin ? join(pathConfig.stateDirWin, 'console_url.txt') : '',
+  ].filter(Boolean);
+  for (const file of [...new Set(candidates)]) {
+    try {
+      if (!existsSync(file) || !statSync(file).isFile()) continue;
+      const match = readFileSync(file, 'utf8').match(/https?:\/\/[^\s<>"']+/u);
+      const found = normalizeConsoleUrl(match?.[0] || '');
+      if (found) return found;
+    } catch {
+      // Stale or unreadable address files should not break the result viewer.
+    }
+  }
+  return '';
+}
+
+function normalizedLoopbackHost(hostname) {
+  const value = String(hostname || '').toLowerCase();
+  return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(value) ? 'loopback' : value;
+}
+
+function defaultPort(protocol) {
+  return protocol === 'https:' ? 443 : 80;
+}
+
+function isCurrentViewerUrl(value) {
+  try {
+    const url = new URL(value);
+    const urlPort = Number(url.port || defaultPort(url.protocol));
+    const currentPort = Number(options.port || defaultPort(url.protocol));
+    return urlPort === currentPort && normalizedLoopbackHost(url.hostname) === normalizedLoopbackHost(options.host);
+  } catch {
+    return false;
+  }
+}
+
+function knownConsoleUrl() {
+  const explicit = options.consoleUrl;
+  if (explicit && !isCurrentViewerUrl(explicit)) return explicit;
+  const fromState = consoleUrlFromStateFile();
+  return fromState && !isCurrentViewerUrl(fromState) ? fromState : '';
+}
+
+function isConsoleScreenPath(pathname) {
+  return /^\/(?:backup|agent|jobs|doctor|chats|settings)\/?$/u.test(pathname);
+}
+
+function sendConsoleScreenRecovery(res) {
+  const body = `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>백업 화면 다시 열기</title>
+  <style>
+    body { margin: 0; font-family: "Malgun Gothic", system-ui, sans-serif; background: #f6f8fb; color: #17202a; }
+    main { max-width: 720px; margin: 12vh auto; padding: 32px; background: #fff; border: 1px solid #dce3ec; border-radius: 8px; box-shadow: 0 16px 40px rgba(15, 23, 42, .08); }
+    h1 { margin: 0 0 12px; font-size: 24px; }
+    p { margin: 10px 0; line-height: 1.7; }
+    strong { color: #0f766e; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>백업 화면을 다시 열어 주세요</h1>
+    <p>지금 주소는 <strong>백업 결과 보기</strong> 주소입니다. 위챗이나 카카오톡 백업 화면 주소가 아닙니다.</p>
+    <p>압축을 푼 폴더에서 <strong>1_백업_시작.bat</strong>를 다시 실행하거나, <strong>2_백업_화면.url</strong>을 더블클릭하세요.</p>
+    <p>다음 실행부터는 결과 보기 주소로 백업 화면을 열어도 자동으로 올바른 화면으로 이동합니다.</p>
+  </main>
+</body>
+</html>`;
+  res.writeHead(200, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
+  });
+  res.end(body);
+}
+
+function recoverConsoleScreenRequest(res, url) {
+  if (!isConsoleScreenPath(url.pathname)) return false;
+  const consoleUrl = knownConsoleUrl();
+  if (consoleUrl) {
+    res.writeHead(302, {
+      location: `${consoleUrl}${url.pathname}${url.search}`,
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+    });
+    res.end();
+  } else {
+    sendConsoleScreenRecovery(res);
+  }
+  return true;
+}
+
 function publicRoom(room) {
   return {
     id: room.id,
@@ -1685,6 +1798,7 @@ function routeApi(req, res, url) {
 const server = createServer((req, res) => {
   try {
     const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
+    if (recoverConsoleScreenRequest(res, url)) return;
     if (url.pathname.startsWith('/api/')) routeApi(req, res, url);
     else serveStatic(req, res, url);
   } catch (err) {

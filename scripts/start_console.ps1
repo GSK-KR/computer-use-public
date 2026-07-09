@@ -119,6 +119,16 @@ function Test-ConsoleHealth {
   }
 }
 
+function Test-ChatViewerHealth {
+  try {
+    $r = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 1
+    $samePackageServer = ($null -ne $r.instance -and $expectedConsoleRootHashes -contains [string]$r.instance.rootHash)
+    return ($null -ne $r -and $r.schema -eq 'chat_artifact_viewer.health.v1' -and $samePackageServer)
+  } catch {
+    return $false
+  }
+}
+
 function Test-HttpOccupied {
   $client = $null
   try {
@@ -131,6 +141,35 @@ function Test-HttpOccupied {
     return $false
   } finally {
     if ($null -ne $client) { $client.Close() }
+  }
+}
+
+function Get-LocalListenerProcessId {
+  try {
+    $conn = Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -ne $conn -and $null -ne $conn.OwningProcess) { return [int]$conn.OwningProcess }
+  } catch {
+  }
+  try {
+    $pattern = "127\.0\.0\.1:$Port\s+.*LISTENING\s+(\d+)"
+    $line = netstat -ano -p tcp | Select-String -Pattern $pattern | Select-Object -First 1
+    if ($null -ne $line -and $line.Matches.Count -gt 0) { return [int]$line.Matches[0].Groups[1].Value }
+  } catch {
+  }
+  return 0
+}
+
+function Stop-MatchingChatViewerOnAddress {
+  if (-not (Test-ChatViewerHealth)) { return $false }
+  $listenerProcessId = Get-LocalListenerProcessId
+  if ($listenerProcessId -le 0) { return $false }
+  try {
+    Write-Host "이전 결과 화면이 백업 화면 주소를 막고 있어 정리합니다." -ForegroundColor Yellow
+    Stop-Process -Id $listenerProcessId -Force -ErrorAction Stop
+    Start-Sleep -Milliseconds 700
+    return $true
+  } catch {
+    return $false
   }
 }
 
@@ -348,6 +387,7 @@ function Start-WindowsNodeConsole {
   $serverScript = @"
 `$ErrorActionPreference = 'Stop'
 `$env:CU_CONSOLE_REQUIRE_TOKEN = '$requireToken'
+`$env:CU_CONSOLE_URL = 'http://127.0.0.1:$Port'
 Set-Location -LiteralPath $repoLiteral
 & $nodeLiteral 'scripts\computer_use_console_server.mjs' '--host' '127.0.0.1' '--port' '$Port' > $logLiteral 2> $errLiteral
 "@
@@ -418,6 +458,10 @@ function Test-WslAvailable {
 Assert-ConsoleStorageReady
 Write-ConsoleTroubleshootingFile "$baseUrl/"
 
+if ((Test-HttpOccupied) -and -not (Test-ConsoleHealth)) {
+  [void](Stop-MatchingChatViewerOnAddress)
+}
+
 while (-not $explicitPort -and (Test-HttpOccupied) -and -not (Test-ConsoleHealth)) {
   Write-Host "기본 백업 화면 주소가 이미 사용 중입니다. 다른 주소로 다시 시도합니다." -ForegroundColor Yellow
   $Port++
@@ -465,7 +509,7 @@ $script = @"
 set -euo pipefail
 cd $repo
 mkdir -p $state
-exec node scripts/computer_use_console_server.mjs --host 127.0.0.1 --port $Port > $state/console_server_$Port.log 2> $state/console_server_$Port.err.log
+CU_CONSOLE_URL='http://127.0.0.1:$Port' exec node scripts/computer_use_console_server.mjs --host 127.0.0.1 --port $Port > $state/console_server_$Port.log 2> $state/console_server_$Port.err.log
 "@
 [System.IO.File]::WriteAllText($launchWin, $script, (New-Object System.Text.UTF8Encoding $false))
 

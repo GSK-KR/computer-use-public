@@ -524,7 +524,11 @@ async function ensureChatViewer() {
         String(port),
       ], {
         cwd: rootDir,
-        env: { ...process.env, CHAT_VIEW_PORT: String(port) },
+        env: {
+          ...process.env,
+          CHAT_VIEW_PORT: String(port),
+          CU_CONSOLE_URL: process.env.CU_CONSOLE_URL || `http://${options.host}:${options.port}`,
+        },
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
       });

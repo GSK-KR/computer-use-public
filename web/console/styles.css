@@ -524,14 +524,18 @@ button.danger:hover {
 }
 
 .home-detail-drawer,
-.beginner-help-panel details {
+.nested-help-drawer {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfe;
 }
 
-.home-detail-drawer summary,
-.beginner-help-panel summary {
+.nested-help-drawer {
+  margin: 0 12px 12px;
+}
+
+.home-detail-drawer > summary,
+.nested-help-drawer > summary {
   list-style: none;
   min-height: 48px;
   display: flex;
@@ -544,13 +548,13 @@ button.danger:hover {
   font-weight: 750;
 }
 
-.home-detail-drawer summary::-webkit-details-marker,
-.beginner-help-panel summary::-webkit-details-marker {
+.home-detail-drawer > summary::-webkit-details-marker,
+.nested-help-drawer > summary::-webkit-details-marker {
   display: none;
 }
 
-.home-detail-drawer summary::after,
-.beginner-help-panel summary::after {
+.home-detail-drawer > summary::after,
+.nested-help-drawer > summary::after {
   content: "펼치기";
   flex: 0 0 auto;
   color: var(--accent);
@@ -558,24 +562,24 @@ button.danger:hover {
   font-weight: 850;
 }
 
-.home-detail-drawer[open] summary::after,
-.beginner-help-panel details[open] summary::after {
+.home-detail-drawer[open] > summary::after,
+.nested-help-drawer[open] > summary::after {
   content: "접기";
 }
 
-.home-detail-drawer summary span,
-.beginner-help-panel summary span {
+.home-detail-drawer > summary span,
+.nested-help-drawer > summary span {
   display: grid;
   gap: 2px;
 }
 
-.home-detail-drawer summary strong,
-.beginner-help-panel summary strong {
+.home-detail-drawer > summary strong,
+.nested-help-drawer > summary strong {
   font-size: 14px;
 }
 
-.home-detail-drawer summary small,
-.beginner-help-panel summary small {
+.home-detail-drawer > summary small,
+.nested-help-drawer > summary small {
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
@@ -980,10 +984,6 @@ button.danger:hover {
   padding: 8px 10px;
   font-size: 12px;
   font-weight: 650;
-}
-
-.helper-panel {
-  align-content: start;
 }
 
 .use-steps {

@@ -725,8 +725,8 @@ async function dashboardView() {
   const dashboardOcrGuide = doctorPending || chatOcrReady
     ? ''
     : `<div class="home-setup-guide">
-        <strong>문자 인식 설정 순서</strong>
-        <p>카카오톡만 먼저 백업할 때는 한국어, 위챗을 백업할 때는 중국어(간체, 중국) 또는 중국어(번체, 대만/홍콩) 중 하나를 준비하면 됩니다.</p>
+        <strong>문자 인식 설정</strong>
+        <p>카카오톡은 한국어, 위챗은 중국어 문자 인식을 사용합니다.</p>
         ${ocrSetupGuideHtml()}
       </div>`;
   const resultButtonClass = doctorPending || coreBackupReady ? 'primary' : '';
@@ -938,7 +938,7 @@ async function dashboardView() {
           <summary>
             <span>
               <strong>막힐 때만 자세히 보기</strong>
-              <small>앱 열기, 문자 인식, 저장 폴더 확인 버튼을 모아 둔 곳입니다.</small>
+              <small>앱 열기, 문자 인식, 저장 위치만 확인합니다.</small>
             </span>
           </summary>
           <div class="platform-grid">
@@ -972,12 +972,12 @@ async function dashboardView() {
           </ol>
           <div class="method-note" aria-label="기본 사용 기준">
             <strong>기본 사용 기준</strong>
-            <p>AI 보정은 선택 기능입니다. 처음 백업은 Windows 문자 인식으로 시작하고, 추가 검수는 필요할 때만 사용합니다. Windows 기본 백업은 고급 실행 환경 없이 시작하고, 앱 화면을 읽어 저장하며 내부 DB를 직접 열지 않습니다. 외부 검수/번역 기능은 기본으로 꺼져 있습니다.</p>
+            <p>처음 백업은 Windows 문자 인식으로 시작합니다. AI 보정과 외부 검수/번역은 선택 기능이며 기본으로 꺼져 있습니다. 앱 화면을 읽어 저장하고 내부 DB는 직접 열지 않습니다.</p>
           </div>
           <div class="home-recovery" aria-label="막힐 때 확인">
             <div>
               <strong>막힐 때</strong>
-              <p>앱을 열었는데도 백업이 안 되면 상태 새로고침과 준비 확인을 먼저 누르세요. 화면이 오래된 주소처럼 보이면 브라우저와 검은 창을 닫고 1_백업_시작.bat를 다시 실행하세요.</p>
+              <p>버튼이 막히면 상태 새로고침과 준비 확인을 누릅니다. 오래된 주소처럼 보이면 1_백업_시작.bat를 다시 실행하세요.</p>
             </div>
             <div class="home-recovery-actions">
               <button data-action="backup-wechat" class="primary" type="button">위챗 백업으로 이동</button>
@@ -989,47 +989,44 @@ async function dashboardView() {
               <button data-action="open-folder" type="button">백업 폴더 열기</button>
             </div>
           </div>
-        </details>
-        <div id="homeLog" class="home-log">${esc(homeHint)}</div>
-      </section>
-
-      <section class="panel span-12 helper-panel beginner-help-panel">
-        <details>
-          <summary>
-            <span>
-              <strong>사용 순서와 준비 상태 보기</strong>
-              <small>처음 선택 버튼으로 충분하지 않을 때만 펼칩니다.</small>
-            </span>
-          </summary>
-          <div class="help-columns">
-            <div>
-              <div class="toolbar"><strong>사용 순서</strong></div>
-              <ol class="use-steps">
-                <li><span>1</span><div><strong>앱을 엽니다</strong><p>위챗 또는 카카오톡에 로그인합니다.</p></div></li>
-                <li><span>2</span><div><strong>방을 선택합니다</strong><p>앱에서 백업할 방을 누른 뒤 이 브라우저로 돌아옵니다.</p></div></li>
-                <li><span>3</span><div><strong>백업을 시작합니다</strong><p>처음에는 기본값 그대로 시작하고, 길이 조정은 필요할 때만 고급 옵션을 엽니다.</p></div></li>
-                <li><span>4</span><div><strong>결과를 확인합니다</strong><p>백업이 끝나면 결과 보기에서 대화와 품질 표시를 확인합니다.</p></div></li>
-              </ol>
-            </div>
-            <div>
-              <div class="toolbar">
-                <strong>준비 상태</strong>
-                <span class="badge ${statusClass(doctorBadgeClass)}">${esc(doctorBadgeText)}</span>
+          <details class="nested-help-drawer">
+            <summary>
+              <span>
+                <strong>사용 순서와 준비 상태</strong>
+                <small>필요할 때만 확인합니다.</small>
+              </span>
+            </summary>
+            <div class="help-columns">
+              <div>
+                <div class="toolbar"><strong>사용 순서</strong></div>
+                <ol class="use-steps">
+                  <li><span>1</span><div><strong>앱을 엽니다</strong><p>위챗 또는 카카오톡에 로그인합니다.</p></div></li>
+                  <li><span>2</span><div><strong>방을 선택합니다</strong><p>앱에서 백업할 방을 누른 뒤 이 브라우저로 돌아옵니다.</p></div></li>
+                  <li><span>3</span><div><strong>백업을 시작합니다</strong><p>처음에는 기본값 그대로 시작합니다.</p></div></li>
+                  <li><span>4</span><div><strong>결과를 확인합니다</strong><p>백업이 끝나면 결과 보기에서 확인합니다.</p></div></li>
+                </ol>
               </div>
-              <div class="ready-summary">
-                <strong>${esc(readinessText)}</strong>
-                <p>${esc(ocrText)} 선택 기능 상태는 준비 확인에서 따로 볼 수 있습니다.</p>
-                ${dashboardOcrGuide}
-                <div class="ready-actions">
-                  ${ocrSettingsButton}
-                  <button data-action="refresh-home" type="button">상태 새로고침</button>
-                  <button data-action="doctor" type="button">준비 확인</button>
-                  <button data-action="chats" class="${resultButtonClass}" type="button">결과 보기</button>
+              <div>
+                <div class="toolbar">
+                  <strong>준비 상태</strong>
+                  <span class="badge ${statusClass(doctorBadgeClass)}">${esc(doctorBadgeText)}</span>
+                </div>
+                <div class="ready-summary">
+                  <strong>${esc(readinessText)}</strong>
+                  <p>${esc(ocrText)} 선택 기능 상태는 준비 확인에서 따로 볼 수 있습니다.</p>
+                  ${dashboardOcrGuide}
+                  <div class="ready-actions">
+                    ${ocrSettingsButton}
+                    <button data-action="refresh-home" type="button">상태 새로고침</button>
+                    <button data-action="doctor" type="button">준비 확인</button>
+                    <button data-action="chats" class="${resultButtonClass}" type="button">결과 보기</button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </details>
         </details>
+        <div id="homeLog" class="home-log">${esc(homeHint)}</div>
       </section>
     </div>`;
   view.querySelector('[data-action="jobs"]')?.addEventListener('click', () => navigate('/jobs'));
@@ -2249,7 +2246,7 @@ async function backupView() {
             <button id="wechatBatch" type="button" ${wechatBatchDisabled} ${disabledTitle(wechatBatchMissing)}>목록 백업 실행</button>
           </div>
         </div>
-        <p class="helper-note">이 기능이 위챗 통째 백업입니다. 시작 전에는 위챗 앱 창을 앞에 두고 왼쪽 채팅 목록이 보이게 둡니다. 처음에는 전체 목록 확인으로 후보 이름을 보고, 괜찮으면 목록 백업 실행을 누릅니다. 방 하나가 일시적으로 실패하면 기본 1회 다시 시도합니다. 현재 화면에 보이는 몇 개만 백업하려면 고급 옵션에서 끝까지 자동 스크롤을 끄세요.</p>
+        <p class="helper-note">위챗 앱 창을 앞에 두고 왼쪽 목록이 보이게 둡니다. 전체 목록 확인으로 후보를 본 뒤 맞으면 목록 백업 실행을 누릅니다. 방 하나가 일시적으로 실패하면 기본 1회 다시 시도합니다.</p>
         ${batchListConfirmHtml('wechatBatchReady', 'wechatBatchReadyError', '위챗')}
         ${blockedNote(wechatBatchMissing)}
         <details class="advanced-options">
@@ -2321,7 +2318,7 @@ async function backupView() {
             <button id="kakaoBatch" type="button" ${kakaoBatchDisabled} ${disabledTitle(kakaoBatchMissing)}>목록 백업 실행</button>
           </div>
         </div>
-        <p class="helper-note">이 기능이 카카오톡 통째 백업입니다. 시작 전에는 카카오톡 앱 창을 앞에 두고 왼쪽 채팅 목록이 보이게 둡니다. 처음에는 전체 목록 확인으로 후보 이름을 보고, 괜찮으면 목록 백업 실행을 누릅니다. 목록 백업은 방마다 기본 120장까지 과거 대화를 읽고, 방 하나가 일시적으로 실패하면 기본 1회 다시 시도합니다. 특정 방 하나만 열려면 아래 목록에서 찾기를 사용하세요.</p>
+        <p class="helper-note">카카오톡 앱 창을 앞에 두고 왼쪽 목록이 보이게 둡니다. 전체 목록 확인으로 후보를 본 뒤 맞으면 목록 백업 실행을 누릅니다. 방마다 기본 120장까지 읽고, 일시 실패는 기본 1회 다시 시도합니다.</p>
         ${batchListConfirmHtml('kakaoBatchReady', 'kakaoBatchReadyError', '카카오톡')}
         ${blockedNote(kakaoBatchMissing)}
         <details class="advanced-options">

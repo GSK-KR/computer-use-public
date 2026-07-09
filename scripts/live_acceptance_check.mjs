@@ -658,7 +658,8 @@ function inspectPublicPackage(checks) {
     { reportLauncherOk, readinessLauncherOk },
   );
 
-  const recoveryOk = recoveryText.includes('여러 방을 한 번에 저장하려면 백업 화면의 "여러 방 저장" 영역에서 위챗 통째 백업 확인 또는 카카오톡 통째 백업 확인을 누릅니다')
+  const recoveryOk = recoveryText.includes('여러 방을 한 번에 저장하려면 첫 화면의 위챗 통째 백업 확인 또는 카카오톡 통째 백업 확인을 누릅니다')
+    && recoveryText.includes('누른 뒤 앱 창을 앞에 두고 왼쪽 채팅 목록이 보이게 둡니다')
     && recoveryText.includes('백업 화면의 준비 체크 위치로 이동합니다')
     && recoveryText.includes('앱 창과 왼쪽 목록 준비를 체크한 뒤 전체 목록 확인을 누릅니다')
     && recoveryText.includes('바로 클릭하지 않고 전체 목록 확인으로 후보 방 이름을 먼저 보여 준 뒤, 후보가 맞을 때 목록 백업 실행으로 이어집니다')

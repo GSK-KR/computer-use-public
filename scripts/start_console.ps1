@@ -129,6 +129,38 @@ function Test-ChatViewerHealth {
   }
 }
 
+function Get-ComputerUseHealthForPort([int]$TargetPort) {
+  try {
+    return Invoke-RestMethod -Uri "http://127.0.0.1:$TargetPort/api/health" -TimeoutSec 1
+  } catch {
+    return $null
+  }
+}
+
+function Test-StaleConsoleHealth {
+  try {
+    $r = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 1
+    if (-not ($null -ne $r -and $r.schema -eq 'computer-use.console-health.v1' -and $r.ok)) {
+      return $false
+    }
+    $strictRequested = [bool]$StrictToken
+    $strictServer = ($null -ne $r.tokenRequired -and [bool]$r.tokenRequired)
+    $samePackageServer = ($null -ne $r.instance -and $expectedConsoleRootHashes -contains [string]$r.instance.rootHash)
+    $serverPlatform = if ($null -ne $r.runtime -and $null -ne $r.runtime.platform) { [string]$r.runtime.platform } else { '' }
+    $preferredRuntime = (-not $preferWindowsServer) -or $serverPlatform -eq 'win32'
+    $usable = $samePackageServer -and $preferredRuntime -and ($strictRequested -or -not $strictServer)
+    return (-not $usable)
+  } catch {
+    return $false
+  }
+}
+
+function Test-ComputerUseHealthSchema($Health) {
+  if ($null -eq $Health) { return $false }
+  $schema = [string]$Health.schema
+  return ($schema -eq 'computer-use.console-health.v1' -or $schema -eq 'chat_artifact_viewer.health.v1')
+}
+
 function Test-HttpOccupied {
   $client = $null
   try {
@@ -144,19 +176,37 @@ function Test-HttpOccupied {
   }
 }
 
-function Get-LocalListenerProcessId {
+function Get-LocalListenerProcessIdForPort([int]$TargetPort) {
   try {
-    $conn = Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    $conn = Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort $TargetPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -ne $conn -and $null -ne $conn.OwningProcess) { return [int]$conn.OwningProcess }
   } catch {
   }
   try {
-    $pattern = "127\.0\.0\.1:$Port\s+.*LISTENING\s+(\d+)"
+    $pattern = "127\.0\.0\.1:$TargetPort\s+.*LISTENING\s+(\d+)"
     $line = netstat -ano -p tcp | Select-String -Pattern $pattern | Select-Object -First 1
     if ($null -ne $line -and $line.Matches.Count -gt 0) { return [int]$line.Matches[0].Groups[1].Value }
   } catch {
   }
   return 0
+}
+
+function Get-LocalListenerProcessId {
+  return Get-LocalListenerProcessIdForPort $Port
+}
+
+function Stop-StaleConsoleOnAddress {
+  if (-not (Test-StaleConsoleHealth)) { return $false }
+  $listenerProcessId = Get-LocalListenerProcessId
+  if ($listenerProcessId -le 0) { return $false }
+  try {
+    Write-Host "이전 백업 화면이 오래되어 정리합니다." -ForegroundColor Yellow
+    Stop-Process -Id $listenerProcessId -Force -ErrorAction Stop
+    Start-Sleep -Milliseconds 900
+    return $true
+  } catch {
+    return $false
+  }
 }
 
 function Stop-MatchingChatViewerOnAddress {
@@ -170,6 +220,22 @@ function Stop-MatchingChatViewerOnAddress {
     return $true
   } catch {
     return $false
+  }
+}
+
+function Stop-OtherComputerUseServers {
+  $knownPorts = (@([int]$cuConfig.defaultConsolePort) + (8766..8785) + @($Port + 1)) | Where-Object { $_ -gt 0 -and $_ -ne $Port } | Select-Object -Unique
+  foreach ($candidatePort in $knownPorts) {
+    $health = Get-ComputerUseHealthForPort $candidatePort
+    if (-not (Test-ComputerUseHealthSchema $health)) { continue }
+    $listenerProcessId = Get-LocalListenerProcessIdForPort $candidatePort
+    if ($listenerProcessId -le 0) { continue }
+    try {
+      Write-Host "오래된 백업 화면 주소를 정리합니다: http://127.0.0.1:$candidatePort" -ForegroundColor Yellow
+      Stop-Process -Id $listenerProcessId -Force -ErrorAction Stop
+    } catch {
+      # Cleanup is best-effort; the chosen console address remains usable.
+    }
   }
 }
 
@@ -343,6 +409,7 @@ winget install OpenJS.NodeJS.LTS
 function Open-Console {
   Write-ConsoleAddressFiles
   Write-ConsoleTroubleshootingFile "$baseUrl/"
+  Stop-OtherComputerUseServers
   if ($NoBrowser) { return }
   Start-Process "$baseUrl/" | Out-Null
 }
@@ -477,6 +544,9 @@ Write-ConsoleTroubleshootingFile "$baseUrl/"
 
 if ((Test-HttpOccupied) -and -not (Test-ConsoleHealth)) {
   [void](Stop-MatchingChatViewerOnAddress)
+  if ((Test-HttpOccupied) -and -not (Test-ConsoleHealth)) {
+    [void](Stop-StaleConsoleOnAddress)
+  }
 }
 
 while (-not $explicitPort -and (Test-HttpOccupied) -and -not (Test-ConsoleHealth)) {

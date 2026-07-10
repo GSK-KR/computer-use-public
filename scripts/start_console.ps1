@@ -181,6 +181,22 @@ function Quote-PowerShellLiteral([string]$Value) {
   return "'" + $Value.Replace("'", "''") + "'"
 }
 
+function Remove-LegacyAddressFiles {
+  foreach ($name in @('Computer-Use-Web.url', 'Computer-Use-Web.bat')) {
+    foreach ($dir in @($cuConfig.repoRootWin, $cuConfig.stateDirWin)) {
+      if ([string]::IsNullOrWhiteSpace($dir)) { continue }
+      try {
+        $path = Join-Path $dir $name
+        if (Test-Path -LiteralPath $path) {
+          Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+        }
+      } catch {
+        # Stale shortcuts are only a fallback cleanup target; startup can continue.
+      }
+    }
+  }
+}
+
 function Write-ConsoleAddressFiles {
   $url = "$baseUrl/"
   $wechatUrl = "$baseUrl/backup#wechat"
@@ -227,6 +243,7 @@ OneDrive 동기화 오류가 난 폴더, 회사 보안 폴더, 읽기 전용 폴
   $kakaoFullShortcut = "[InternetShortcut]`r`nURL=$kakaoFullUrl`r`n"
   try {
     New-Item -ItemType Directory -Force -Path $cuConfig.stateDirWin | Out-Null
+    Remove-LegacyAddressFiles
     [System.IO.File]::WriteAllText($textPath, $text, (New-Object System.Text.UTF8Encoding $false))
     [System.IO.File]::WriteAllText($koreanShortcutStatePath, $shortcut, [System.Text.Encoding]::ASCII)
     [System.IO.File]::WriteAllText($koreanShortcutRootPath, $shortcut, [System.Text.Encoding]::ASCII)

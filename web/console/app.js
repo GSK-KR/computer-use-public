@@ -71,6 +71,10 @@ function routePath() {
   return routes[location.pathname] ? location.pathname : '/';
 }
 
+function advancedAgentRequested() {
+  return new URL(location.href).searchParams.get('advanced') === '1';
+}
+
 function activeNavKey(path, hash) {
   if (path === '/') return 'home';
   if (path === '/chats') return 'chats';
@@ -3222,14 +3226,14 @@ function streamJob(id, options = {}) {
 async function agentView() {
   const modules = await api('/api/modules').catch(() => ({ modules: [] }));
   const hasAgent = Array.isArray(modules.modules) && modules.modules.some((item) => item.module === 'agent');
-  if (!hasAgent) {
+  if (!hasAgent || !advancedAgentRequested()) {
     setChrome('카카오톡/위챗 백업', '백업과 결과 확인을 바로 이어서 진행합니다');
     view.innerHTML = `
       <div class="grid">
         <section class="panel span-12 unavailable-panel">
           <div>
             <h2>백업 화면으로 이동하세요</h2>
-            <p>이 화면에서는 카카오톡/위챗 백업과 결과 확인만 제공합니다. 아래 버튼으로 바로 이어서 진행하세요.</p>
+            <p>일반 사용 화면에서는 카카오톡/위챗 백업과 결과 확인만 제공합니다. 아래 버튼으로 바로 이어서 진행하세요.</p>
           </div>
           <div class="unavailable-actions">
             <button data-agent-fallback="wechat" class="primary" type="button">위챗 백업</button>

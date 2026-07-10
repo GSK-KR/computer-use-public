@@ -1508,7 +1508,7 @@ function knownConsoleUrl() {
 }
 
 function isConsoleScreenPath(pathname) {
-  return /^\/(?:backup|agent|jobs|doctor|chats|settings)\/?$/u.test(pathname);
+  return /^\/(?:backup|agent|jobs|doctor|chats|settings)(?:\/.*)?$/u.test(pathname);
 }
 
 function sendConsoleScreenRecovery(res) {

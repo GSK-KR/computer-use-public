@@ -192,6 +192,38 @@ function sendError(res, status, message, extra = {}) {
   sendJson(res, status, { error: message, ...extra });
 }
 
+function sendMissingConsolePage(res) {
+  const body = `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>백업 화면 다시 열기</title>
+  <style>
+    body { margin: 0; font-family: "Malgun Gothic", system-ui, sans-serif; background: #f6f8fb; color: #17202a; }
+    main { max-width: 720px; margin: 12vh auto; padding: 32px; background: #fff; border: 1px solid #dce3ec; border-radius: 8px; box-shadow: 0 16px 40px rgba(15, 23, 42, .08); }
+    h1 { margin: 0 0 12px; font-size: 24px; }
+    p { margin: 10px 0; line-height: 1.7; }
+    a { color: #0f766e; font-weight: 800; }
+  </style>
+</head>
+<body>
+  <main data-smoke-id="console-recovery">
+    <h1>백업 화면을 다시 열어 주세요</h1>
+    <p>지금 주소는 오래되었거나 잘못된 백업 화면 주소입니다.</p>
+    <p><a href="/">처음 화면으로 돌아가기</a>를 누르거나, 압축을 푼 폴더의 <strong>1_백업_시작.bat</strong>를 다시 실행하세요.</p>
+    <p>아무 값도 입력하지 않습니다.</p>
+  </main>
+</body>
+</html>`;
+  res.writeHead(404, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
+  });
+  res.end(body);
+}
+
 function artifactContentType(file) {
   if (/\.json$/u.test(file)) return 'application/json; charset=utf-8';
   if (/\.jsonl$/u.test(file)) return 'application/x-ndjson; charset=utf-8';
@@ -428,7 +460,7 @@ function serveStatic(req, res, url) {
     if (/^\/(?:backup|agent|jobs|doctor|chats|settings)\/?$/u.test(url.pathname)) {
       file = join(options.staticDir, 'index.html');
     } else {
-      sendError(res, 404, '요청한 화면을 찾지 못했습니다. 처음 화면으로 돌아가세요.');
+      sendMissingConsolePage(res);
       return;
     }
   }

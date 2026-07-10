@@ -58,8 +58,7 @@ function normalizeConsoleUrl(value) {
   try {
     const url = new URL(raw);
     if (!['http:', 'https:'].includes(url.protocol)) return '';
-    url.hash = '';
-    return url.href.replace(/\/+$/u, '');
+    return url.origin;
   } catch {
     return '';
   }

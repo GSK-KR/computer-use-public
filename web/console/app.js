@@ -71,6 +71,11 @@ function routePath() {
   return routes[location.pathname] ? location.pathname : '/';
 }
 
+function currentRouteKey() {
+  const path = routePath();
+  return `${path}${location.hash || ''}`;
+}
+
 function advancedAgentRequested() {
   return new URL(location.href).searchParams.get('advanced') === '1';
 }
@@ -146,6 +151,139 @@ function setChrome(name, detail) {
   title.textContent = name;
   meta.textContent = detail || '이 컴퓨터에서만 열리는 백업 화면';
   setNavActive();
+}
+
+function routeLoadingCopy(path, hash) {
+  const target = String(hash || '').replace(/^#/u, '');
+  if (path === '/backup') {
+    if (target === 'wechat-full') {
+      return {
+        title: '위챗 통째 백업',
+        detail: '전체 목록 확인부터 시작합니다',
+        body: '위챗 왼쪽 목록을 확인할 준비를 하고 있습니다.',
+        actions: [
+          ['위챗 백업', '/backup#wechat'],
+          ['카카오톡 통째 백업', '/backup#kakao-full'],
+          ['결과 보기', '/chats'],
+        ],
+      };
+    }
+    if (target === 'kakao-full') {
+      return {
+        title: '카카오톡 통째 백업',
+        detail: '전체 목록 확인부터 시작합니다',
+        body: '카카오톡 왼쪽 목록을 확인할 준비를 하고 있습니다.',
+        actions: [
+          ['카카오톡 백업', '/backup#kakao'],
+          ['위챗 통째 백업', '/backup#wechat-full'],
+          ['결과 보기', '/chats'],
+        ],
+      };
+    }
+    if (target === 'kakao') {
+      return {
+        title: '카카오톡 백업',
+        detail: '열린 채팅방 백업을 준비합니다',
+        body: '카카오톡 앱과 문자 인식 상태를 확인하고 있습니다.',
+        actions: [
+          ['카카오톡 백업', '/backup#kakao'],
+          ['결과 보기', '/chats'],
+          ['위챗 백업', '/backup#wechat'],
+        ],
+      };
+    }
+    return {
+      title: '위챗 백업',
+      detail: '지금 열린 방 백업을 준비합니다',
+      body: '위챗 앱과 문자 인식 상태를 확인하고 있습니다.',
+      actions: [
+        ['위챗 백업', '/backup#wechat'],
+        ['결과 보기', '/chats'],
+        ['카카오톡 백업', '/backup#kakao'],
+      ],
+    };
+  }
+  if (path === '/chats') {
+    return {
+      title: '결과 보기',
+      detail: '백업 결과를 불러옵니다',
+      body: '위챗과 카카오톡 백업 결과 화면을 준비하고 있습니다.',
+      actions: [
+        ['위챗 백업', '/backup#wechat'],
+        ['카카오톡 백업', '/backup#kakao'],
+      ],
+    };
+  }
+  if (path === '/jobs') {
+    return {
+      title: '진행 기록',
+      detail: '백업 실행 기록을 불러옵니다',
+      body: '최근 백업과 지원용 기록을 확인하고 있습니다.',
+      actions: [
+        ['위챗 백업', '/backup#wechat'],
+        ['카카오톡 백업', '/backup#kakao'],
+      ],
+    };
+  }
+  if (path === '/doctor') {
+    return {
+      title: '준비 확인',
+      detail: '앱과 문자 인식 상태를 확인합니다',
+      body: '기본 백업에 필요한 항목을 확인하고 있습니다.',
+      actions: [
+        ['위챗 백업', '/backup#wechat'],
+        ['카카오톡 백업', '/backup#kakao'],
+      ],
+    };
+  }
+  if (path === '/settings') {
+    return {
+      title: '저장 위치',
+      detail: '백업 폴더를 확인합니다',
+      body: '백업 파일과 진행 기록이 저장되는 위치를 확인하고 있습니다.',
+      actions: [
+        ['결과 보기', '/chats'],
+        ['진행 기록', '/jobs'],
+      ],
+    };
+  }
+  if (path === '/agent') {
+    return {
+      title: '카카오톡/위챗 백업',
+      detail: '기본 백업 화면으로 안내합니다',
+      body: '일반 백업 메뉴를 준비하고 있습니다.',
+      actions: [
+        ['위챗 백업', '/backup#wechat'],
+        ['카카오톡 백업', '/backup#kakao'],
+        ['결과 보기', '/chats'],
+      ],
+    };
+  }
+  return null;
+}
+
+function showRouteLoadingIfNeeded(key) {
+  if (view.dataset.routeKey === key && !view.querySelector('.loading-dashboard')) return;
+  const copy = routeLoadingCopy(routePath(), location.hash || '');
+  if (!copy) return;
+  setChrome(copy.title, copy.detail);
+  const actions = copy.actions.map(([label, href], index) => (
+    `<a class="loading-action${index === 0 ? ' primary' : ''}" href="${esc(href)}">${esc(label)}</a>`
+  )).join('');
+  view.dataset.routeKey = key;
+  view.innerHTML = `<section class="panel loading-panel loading-dashboard route-loading" aria-live="polite">
+    <div class="start-heading simple-start-heading">
+      <div>
+        <span class="guide-kicker">준비 중</span>
+        <strong>${esc(copy.title)}</strong>
+        <p>${esc(copy.body)}</p>
+      </div>
+      <div class="start-heading-side">
+        <span class="badge status-ready">내 컴퓨터 전용</span>
+        <div class="loading-actions" aria-label="바로 이동">${actions}</div>
+      </div>
+    </div>
+  </section>`;
 }
 
 function statusClass(status) {
@@ -3570,10 +3708,13 @@ function navigate(path, options = {}) {
 
 async function render() {
   setNavActive();
+  const renderKey = currentRouteKey();
+  showRouteLoadingIfNeeded(renderKey);
   await refreshHealth();
   const fn = routes[routePath()] || dashboardView;
   try {
     await fn();
+    view.dataset.routeKey = renderKey;
     setNavActive();
   } catch (err) {
     if (err.status === 401 && await tryLocalAuth()) {

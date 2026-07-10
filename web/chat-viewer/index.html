@@ -18,9 +18,9 @@
         </header>
 
         <div class="result-actions" aria-label="결과 화면 빠른 행동">
-          <a class="result-action primary" href="/backup#wechat" target="_top">위챗 백업</a>
+          <a class="result-action primary" href="/backup#wechat" data-console-path="/backup#wechat" target="_top">위챗 백업</a>
           <button class="result-action" type="button" data-quick-platform="wechat">위챗 결과</button>
-          <a class="result-action" href="/backup#kakao" target="_top">카카오톡 백업</a>
+          <a class="result-action" href="/backup#kakao" data-console-path="/backup#kakao" target="_top">카카오톡 백업</a>
         </div>
 
         <section id="resultGuide" class="result-guide" aria-label="결과 상태 안내">
@@ -71,6 +71,7 @@
       </main>
     </div>
 
+    <script>window.CHAT_VIEW_CONSOLE_BASE = "";</script>
     <script src="app.js"></script>
   </body>
 </html>

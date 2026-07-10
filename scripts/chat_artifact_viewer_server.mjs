@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { extname, join, relative, resolve, sep } from 'node:path';
+import { basename, extname, join, relative, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadKakaoOpenchatMessages } from './lib/kakao_openchat_structure_core.mjs';
@@ -1753,12 +1753,20 @@ function serveStatic(req, res, url) {
     sendMissingStaticPage(res);
     return;
   }
+  let body = readFileSync(file);
+  if (basename(file) === 'index.html') {
+    const consoleBase = knownConsoleUrl();
+    body = Buffer.from(readFileSync(file, 'utf8').replace(
+      'window.CHAT_VIEW_CONSOLE_BASE = "";',
+      `window.CHAT_VIEW_CONSOLE_BASE = ${JSON.stringify(consoleBase)};`,
+    ));
+  }
   res.writeHead(200, {
     'content-type': mimeType(file),
     'cache-control': 'no-store',
     'x-content-type-options': 'nosniff',
   });
-  res.end(readFileSync(file));
+  res.end(body);
 }
 
 function serveArtifactFile(res, url) {

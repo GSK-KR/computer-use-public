@@ -15,6 +15,17 @@ const state = {
 
 const apiBase = window.CHAT_VIEW_API_BASE
   || (location.pathname.startsWith('/chat-viewer') ? '/chat-viewer/api' : '/api');
+const consoleBase = (() => {
+  const raw = String(window.CHAT_VIEW_CONSOLE_BASE || '').trim().replace(/\/+$/u, '');
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if ((url.protocol === 'http:' || url.protocol === 'https:') && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) {
+      return url.origin;
+    }
+  } catch {}
+  return '';
+})();
 const viewParams = new URLSearchParams(location.search);
 const chatScope = viewParams.get('scope') === 'chat' || viewParams.get('platforms') === 'kakao,wechat';
 const defaultApiPlatform = chatScope ? 'chat' : 'all';
@@ -97,7 +108,13 @@ function resourceUrl(path) {
 function consoleUrl(path) {
   const value = String(path || '/');
   const normalized = value.startsWith('/') ? value : `/${value}`;
-  return normalized;
+  return consoleBase ? `${consoleBase}${normalized}` : normalized;
+}
+
+function applyConsoleLinks() {
+  document.querySelectorAll('[data-console-path]').forEach((link) => {
+    link.setAttribute('href', consoleUrl(link.getAttribute('data-console-path') || '/'));
+  });
 }
 
 function n(value) {
@@ -967,4 +984,5 @@ els.exportCsvButton?.addEventListener('click', exportSelectedRoomCsv);
 els.exportTextButton?.addEventListener('click', exportSelectedRoomText);
 
 setupScopedUi();
+applyConsoleLinks();
 loadAll();

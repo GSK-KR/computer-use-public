@@ -144,7 +144,7 @@ const report = await runDoctor();
 mkdirSync(dirname(args.outMd), { recursive: true });
 mkdirSync(dirname(args.outJson), { recursive: true });
 writeFileSync(args.outJson, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-writeFileSync(args.outMd, reportMarkdown(report), 'utf8');
+writeFileSync(args.outMd, `\uFEFF${reportMarkdown(report)}`, 'utf8');
 console.log(`보고서 파일: ${args.outMd}`);
 console.log('채팅 내용 없이 준비 상태만 저장했습니다.');
 if (args.open && existsSync(args.outMd)) openFile(args.outMd);

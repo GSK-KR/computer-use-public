@@ -3597,6 +3597,7 @@ document.querySelectorAll('.nav a').forEach((a) => a.addEventListener('click', (
   navigate(a.getAttribute('href'));
 }));
 window.addEventListener('popstate', render);
+window.addEventListener('hashchange', render);
 refreshBtn.addEventListener('click', render);
 quickWechatBtn.addEventListener('click', () => navigate('/backup#wechat'));
 quickChatsBtn.addEventListener('click', () => navigate('/chats'));

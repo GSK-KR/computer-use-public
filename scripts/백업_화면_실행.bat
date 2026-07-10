@@ -3,7 +3,7 @@ setlocal
 chcp 65001 >nul
 set "SCRIPT_DIR=%~dp0"
 set "CONFIG_FILE=%SCRIPT_DIR%..\state\config.json"
-del /q "%SCRIPT_DIR%..\2_백업_화면.url" "%SCRIPT_DIR%..\백업 화면.url" "%SCRIPT_DIR%..\Computer-Use-Web.url" "%SCRIPT_DIR%..\2_1_위챗_백업.url" "%SCRIPT_DIR%..\2_2_카카오톡_백업.url" "%SCRIPT_DIR%..\2_3_위챗_통째백업.url" "%SCRIPT_DIR%..\2_4_카카오톡_통째백업.url" >nul 2>nul
+del /q "%SCRIPT_DIR%..\Computer-Use-Web.url" >nul 2>nul
 
 where powershell.exe >nul 2>nul
 if errorlevel 1 (
@@ -40,11 +40,13 @@ if not exist "%CONFIG_FILE%" (
   echo 위챗 바로가기는 2_1_위챗_백업.url, 카카오톡 바로가기는 2_2_카카오톡_백업.url입니다.
   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%install_windows.ps1" -NoDesktopShortcut
 ) else (
+  set "CU_START_CONSOLE_ARGS="
+  if "%CU_NO_BROWSER%"=="1" set "CU_START_CONSOLE_ARGS=-NoBrowser"
   echo 카카오톡/위챗 백업 화면을 여는 중입니다. 브라우저가 열릴 때까지 잠시 기다리세요.
   echo 여러 방을 한 번에 저장하려면 첫 화면의 위챗 통째 백업 확인 또는 카카오톡 통째 백업 확인을 누르세요.
   echo 브라우저가 안 열리면 새로 만들어지는 2_백업_화면.url을 더블클릭하고, 계속 막히면 3_문제_확인.txt 맨 위의 빠른 해결 3단계를 먼저 보세요.
   echo 위챗 바로가기는 2_1_위챗_백업.url, 카카오톡 바로가기는 2_2_카카오톡_백업.url입니다.
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%start_console.ps1"
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%start_console.ps1" %CU_START_CONSOLE_ARGS%
 )
 if errorlevel 1 (
   echo.

@@ -97,6 +97,10 @@ body {
   color: #fff;
 }
 
+.nav a:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .nav a.active,
 .nav a.active:hover {
   background: #1f6f55;

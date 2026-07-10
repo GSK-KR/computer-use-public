@@ -98,6 +98,11 @@ function setNavActive() {
   });
 }
 
+function clearSidebarFocus() {
+  const focused = document.activeElement?.closest?.('.nav a');
+  if (focused) focused.blur();
+}
+
 function hashTargetId() {
   if (!location.hash) return '';
   try {
@@ -3556,8 +3561,9 @@ async function settingsView() {
   });
 }
 
-function navigate(path) {
+function navigate(path, options = {}) {
   history.pushState(null, '', path);
+  if (options.clearSidebarFocus) clearSidebarFocus();
   setNavActive();
   render();
 }
@@ -3601,8 +3607,7 @@ async function render() {
 
 document.querySelectorAll('.nav a').forEach((a) => a.addEventListener('click', (event) => {
   event.preventDefault();
-  navigate(a.getAttribute('href'));
-  if (event.detail > 0) a.blur();
+  navigate(a.getAttribute('href'), { clearSidebarFocus: event.detail > 0 });
 }));
 window.addEventListener('popstate', render);
 window.addEventListener('hashchange', render);

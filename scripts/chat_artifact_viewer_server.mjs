@@ -22,6 +22,8 @@ const defaultWechatDb = process.env.CHAT_VIEW_DEFAULT_WECHAT_DB || (
 );
 const discordEnabled = process.env.CHAT_VIEW_ENABLE_DISCORD === '1'
   || (process.env.CHAT_VIEW_ENABLE_DISCORD !== '0' && existsSync(join(rootDir, 'scripts', 'discord_capture.mjs')));
+const wslSqliteFallbackEnabled = process.env.CHAT_VIEW_ENABLE_WSL_SQLITE === '1'
+  || process.env.CHAT_VIEW_ENABLE_WSL_SQLITE === 'true';
 const instanceHashFiles = [
   'scripts/agent_runner.mjs',
   'scripts/computer_use_console_server.mjs',
@@ -517,20 +519,24 @@ function sqliteCandidates(db, sql) {
     if (configured && !configured.startsWith('/')) addSqliteCandidate(candidates, seen, configured, localArgs);
     addSqliteCandidate(candidates, seen, 'sqlite3', localArgs);
 
-    const wslDb = windowsPathToWsl(db);
-    const wslArgs = ['-readonly', '-cmd', '.timeout 10000', '-json', wslDb, sql];
-    const wslBins = [configured && configured.startsWith('/') ? configured : '', 'sqlite3'];
-    for (const bin of wslBins) {
-      if (bin) addSqliteCandidate(candidates, seen, 'wsl.exe', ['-e', bin, ...wslArgs]);
+    if (wslSqliteFallbackEnabled || (configured && configured.startsWith('/'))) {
+      const wslDb = windowsPathToWsl(db);
+      const wslArgs = ['-readonly', '-cmd', '.timeout 10000', '-json', wslDb, sql];
+      const wslBins = [configured && configured.startsWith('/') ? configured : '', wslSqliteFallbackEnabled ? 'sqlite3' : ''];
+      for (const bin of wslBins) {
+        if (bin) addSqliteCandidate(candidates, seen, 'wsl.exe', ['-e', bin, ...wslArgs]);
+      }
+      if (wslSqliteFallbackEnabled) {
+        addSqliteCandidate(candidates, seen, 'wsl.exe', [
+          '-e',
+          'sh',
+          '-lc',
+          'for c in sqlite3 "$HOME/Android/Sdk/platform-tools/sqlite3"; do if command -v "$c" >/dev/null 2>&1 || [ -x "$c" ]; then exec "$c" "$@"; fi; done; echo "sqlite3 not found" >&2; exit 127',
+          'sqlite-wrapper',
+          ...wslArgs,
+        ]);
+      }
     }
-    addSqliteCandidate(candidates, seen, 'wsl.exe', [
-      '-e',
-      'sh',
-      '-lc',
-      'for c in sqlite3 "$HOME/Android/Sdk/platform-tools/sqlite3"; do if command -v "$c" >/dev/null 2>&1 || [ -x "$c" ]; then exec "$c" "$@"; fi; done; echo "sqlite3 not found" >&2; exit 127',
-      'sqlite-wrapper',
-      ...wslArgs,
-    ]);
     return candidates;
   }
 
@@ -542,7 +548,10 @@ function sqliteCandidates(db, sql) {
 function runSqlite(db, sql) {
   const errors = [];
   for (const [cmd, argv] of sqliteCandidates(db, sql)) {
-    const result = spawnSync(cmd, argv, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const timeout = cmd === 'wsl.exe'
+      ? Number(process.env.CHAT_VIEW_WSL_SQLITE_TIMEOUT_MS || 1200)
+      : Number(process.env.CHAT_VIEW_SQLITE_TIMEOUT_MS || 10000);
+    const result = spawnSync(cmd, argv, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout });
     if (result.error) {
       errors.push(`${cmd}: ${result.error.message}`);
       continue;

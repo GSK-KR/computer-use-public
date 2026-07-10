@@ -1458,7 +1458,58 @@ function sendJson(res, status, payload) {
 }
 
 function sendError(res, status, message) {
-  sendJson(res, status, { error: message });
+  const text = String(message || '');
+  const labels = new Map([
+    ['not found', { code: 'RESULT_PAGE_NOT_FOUND', error: '요청한 결과 화면을 찾지 못했습니다. 결과 보기를 새로고침하거나 백업 화면으로 돌아가세요.' }],
+    ['room not found', { code: 'RESULT_ROOM_NOT_FOUND', error: '요청한 백업 결과를 찾지 못했습니다. 결과 새로고침을 누르세요.' }],
+    ['file not found', { code: 'RESULT_FILE_NOT_FOUND', error: '요청한 결과 파일을 열 수 없습니다. 결과 새로고침을 누르세요.' }],
+    ['missing file', { code: 'RESULT_FILE_MISSING', error: '열 결과 파일이 지정되지 않았습니다. 결과 화면에서 다시 열어 주세요.' }],
+    ['method not allowed', { code: 'RESULT_METHOD_NOT_ALLOWED', error: '이 요청 방식은 사용할 수 없습니다. 결과 화면에서 다시 시도하세요.' }],
+    ['forbidden', { code: 'RESULT_FILE_FORBIDDEN', error: '요청한 결과 파일을 열 수 없습니다.' }],
+  ]);
+  sendJson(res, status, labels.get(text) || { code: 'RESULT_REQUEST_FAILED', error: '요청을 처리하지 못했습니다. 결과 화면을 새로고침한 뒤 다시 시도하세요.' });
+}
+
+function htmlAttr(value) {
+  return String(value ?? '')
+    .replace(/&/gu, '&amp;')
+    .replace(/"/gu, '&quot;')
+    .replace(/</gu, '&lt;')
+    .replace(/>/gu, '&gt;');
+}
+
+function sendMissingStaticPage(res) {
+  const consoleUrl = knownConsoleUrl();
+  const consoleHref = consoleUrl ? `${consoleUrl}/chats` : '/';
+  const body = `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>결과 보기 다시 열기</title>
+  <style>
+    body { margin: 0; font-family: "Malgun Gothic", system-ui, sans-serif; background: #f6f8fb; color: #17202a; }
+    main { max-width: 720px; margin: 12vh auto; padding: 32px; background: #fff; border: 1px solid #dce3ec; border-radius: 8px; box-shadow: 0 16px 40px rgba(15, 23, 42, .08); }
+    h1 { margin: 0 0 12px; font-size: 24px; }
+    p { margin: 10px 0; line-height: 1.7; }
+    a { color: #0f766e; font-weight: 800; }
+  </style>
+</head>
+<body>
+  <main data-smoke-id="result-recovery">
+    <h1>결과 보기 화면을 다시 열어 주세요</h1>
+    <p>지금 주소는 오래되었거나 잘못된 결과 보기 주소입니다.</p>
+    <p><a href="${htmlAttr(consoleHref)}">백업 화면의 결과 보기로 돌아가기</a>를 누르거나, 압축을 푼 폴더의 <strong>1_백업_시작.bat</strong>를 다시 실행하세요.</p>
+    <p>아무 값도 입력하지 않습니다.</p>
+  </main>
+</body>
+</html>`;
+  res.writeHead(404, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
+  });
+  res.end(body);
 }
 
 function consoleUrlFromStateFile() {
@@ -1699,7 +1750,7 @@ function serveStatic(req, res, url) {
   const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
   const file = resolve(options.staticDir, `.${pathname}`);
   if (!isInside(file, options.staticDir) || !existsSync(file) || !statSync(file).isFile()) {
-    sendError(res, 404, 'not found');
+    sendMissingStaticPage(res);
     return;
   }
   res.writeHead(200, {
@@ -1801,7 +1852,7 @@ const server = createServer((req, res) => {
     if (url.pathname.startsWith('/api/')) routeApi(req, res, url);
     else serveStatic(req, res, url);
   } catch (err) {
-    sendError(res, 500, err.message || String(err));
+    sendError(res, 500, err?.message || String(err));
   }
 });
 

@@ -82,9 +82,13 @@ function addCheck(checks, id, status, message, details = {}) {
 }
 
 const restartConsoleText = '브라우저와 검은 창을 닫고 압축을 푼 폴더의 1_백업_시작.bat를 다시 실행하세요.';
+const windowsLoopbackText = 'Windows에서 열린 백업 화면을 검증하는데 WSL 터미널에서 이 보고서를 실행했다면, Windows PowerShell에서 같은 명령을 다시 실행하세요. WSL의 127.0.0.1은 Windows 브라우저가 보는 백업 화면 주소와 다를 수 있습니다.';
 
 function consoleConnectionMessage(prefix, err) {
   const detail = String(err?.message || '응답하지 않습니다');
+  if (process.platform !== 'win32' && isLoopbackTarget()) {
+    return `${prefix}: ${detail}. ${windowsLoopbackText} Windows PowerShell에서도 같은 문제가 나면 ${restartConsoleText}`;
+  }
   return `${prefix}: ${detail}. ${restartConsoleText}`;
 }
 
@@ -282,7 +286,7 @@ function nextStepsFor(checks, summary) {
     || checkStatus(checks, 'console_backup_routes') === 'fail';
   const likelyWindowsLoopbackMismatch = consoleFailed && process.platform !== 'win32' && isLoopbackTarget();
   if (likelyWindowsLoopbackMismatch) {
-    add('Windows에서 열린 백업 화면을 검증할 때는 WSL 터미널이 아니라 Windows PowerShell에서 live_acceptance_check.mjs를 실행하세요. WSL의 127.0.0.1은 Windows 브라우저가 보는 백업 화면 주소와 다를 수 있습니다.');
+    add(windowsLoopbackText);
     return steps;
   }
   if (consoleFailed) {
@@ -322,6 +326,13 @@ function nextStepsFor(checks, summary) {
     add('확인 필요 항목의 문장을 확인한 뒤 해당 화면에서 상태 새로고침 또는 결과 새로고침을 누르세요.');
   }
   return steps;
+}
+
+function likelyLoopbackMismatch(checks) {
+  const consoleFailed = checkStatus(checks, 'console_health') === 'fail'
+    || checkStatus(checks, 'console_beginner_ui') === 'fail'
+    || checkStatus(checks, 'console_backup_routes') === 'fail';
+  return consoleFailed && process.platform !== 'win32' && isLoopbackTarget();
 }
 
 function readFileSafe(file) {
@@ -928,6 +939,7 @@ async function run() {
     wechatRooms: n(resultHealth?.counts?.wechat_rooms),
     discordRooms: n(resultHealth?.counts?.discord_rooms),
     jobs: jobs.length,
+    loopbackMismatch: likelyLoopbackMismatch(checks),
     readiness: {
       status: String(doctorReport?.status || ''),
       backupStatus: String(doctorReport?.backupStatus || doctorStatusForIds(doctorReport, [...commonBackupCheckIds, 'windows_ocr_ko', 'windows_ocr_zh']) || doctorReport?.status || ''),
@@ -966,6 +978,9 @@ function markdown(report) {
   lines.push('');
   lines.push(`- 상태: ${statusLabel(report.status)} (${report.status})`);
   lines.push(`- 주소: ${report.url}`);
+  if (report.summary.loopbackMismatch) {
+    lines.push('- 확인 위치 주의: WSL에서 실행한 검증은 Windows 브라우저의 localhost와 다를 수 있습니다. Windows PowerShell에서 다시 실행하세요.');
+  }
   lines.push(`- 기본 추가 입력 요구: ${report.summary.tokenRequired ? '예' : '아니오'}`);
   lines.push(`- 공개 ZIP 폴더 확인: ${report.summary.packageChecked ? '예' : '아니오'}`);
   lines.push(`- 카카오톡 결과: ${report.summary.kakaoRooms}`);

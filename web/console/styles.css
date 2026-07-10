@@ -83,6 +83,7 @@ body {
   color: #d7dde7;
   text-decoration: none;
   padding: 10px 11px;
+  border: 1px solid transparent;
   border-radius: 6px;
   font-weight: 650;
   letter-spacing: 0;
@@ -98,9 +99,7 @@ body {
 }
 
 .nav a.nav-wechat {
-  background: rgba(34, 160, 107, .16);
-  border: 1px solid rgba(102, 209, 163, .35);
-  color: #f4fff8;
+  color: #d7dde7;
 }
 
 .nav a.nav-wechat.active,

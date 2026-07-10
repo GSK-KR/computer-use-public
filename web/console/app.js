@@ -71,6 +71,26 @@ function routePath() {
   return routes[location.pathname] ? location.pathname : '/';
 }
 
+function navLinkActive(link, path, hash) {
+  const url = new URL(link.getAttribute('href') || '/', location.origin);
+  if (url.pathname !== path) return false;
+  if (path !== '/backup') return true;
+  if (hash.startsWith('#wechat')) return url.hash === '#wechat';
+  if (hash.startsWith('#kakao')) return url.hash === '#kakao';
+  return false;
+}
+
+function setNavActive() {
+  const path = routePath();
+  const hash = location.hash || '';
+  document.querySelectorAll('.nav a').forEach((a) => {
+    const active = navLinkActive(a, path, hash);
+    a.classList.toggle('active', active);
+    if (active) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+}
+
 function hashTargetId() {
   if (!location.hash) return '';
   try {
@@ -113,20 +133,7 @@ function scrollToHashTarget() {
 function setChrome(name, detail) {
   title.textContent = name;
   meta.textContent = detail || '이 컴퓨터에서만 열리는 백업 화면';
-  const path = routePath();
-  const hash = location.hash || '';
-  const links = Array.from(document.querySelectorAll('.nav a'));
-  const exactHashLink = links.some((a) => {
-    const url = new URL(a.getAttribute('href') || '/', location.origin);
-    return url.pathname === path && url.hash && url.hash === hash;
-  });
-  links.forEach((a) => {
-    const url = new URL(a.getAttribute('href') || '/', location.origin);
-    const active = url.hash
-      ? url.pathname === path && url.hash === hash
-      : url.pathname === path && (!exactHashLink || !hash);
-    a.classList.toggle('active', active);
-  });
+  setNavActive();
 }
 
 function statusClass(status) {
@@ -3544,10 +3551,12 @@ async function settingsView() {
 
 function navigate(path) {
   history.pushState(null, '', path);
+  setNavActive();
   render();
 }
 
 async function render() {
+  setNavActive();
   await refreshHealth();
   const fn = routes[routePath()] || dashboardView;
   try {

@@ -71,21 +71,23 @@ function routePath() {
   return routes[location.pathname] ? location.pathname : '/';
 }
 
-function navLinkActive(link, path, hash) {
-  const url = new URL(link.getAttribute('href') || '/', location.origin);
-  if (url.pathname !== path) return false;
-  if (path !== '/backup') return true;
-  if (!hash) return url.hash === '#wechat';
-  if (hash.startsWith('#wechat')) return url.hash === '#wechat';
-  if (hash.startsWith('#kakao')) return url.hash === '#kakao';
-  return false;
+function activeNavKey(path, hash) {
+  if (path === '/') return 'home';
+  if (path === '/chats') return 'chats';
+  if (path === '/doctor') return 'doctor';
+  if (path === '/jobs') return 'jobs';
+  if (path === '/settings') return 'settings';
+  if (path !== '/backup') return '';
+  const target = String(hash || '').replace(/^#/u, '');
+  if (!target || target === 'wechat' || target === 'wechat-full') return 'backup-wechat';
+  if (target === 'kakao' || target === 'kakao-full') return 'backup-kakao';
+  return '';
 }
 
 function setNavActive() {
-  const path = routePath();
-  const hash = location.hash || '';
+  const key = activeNavKey(routePath(), location.hash || '');
   document.querySelectorAll('.nav a').forEach((a) => {
-    const active = navLinkActive(a, path, hash);
+    const active = a.dataset.navKey === key;
     a.classList.toggle('active', active);
     if (active) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');

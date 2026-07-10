@@ -19,6 +19,7 @@ let chatsRenderToken = 0;
 let resultsWide = false;
 let queuedDoctorReport = null;
 let backupReturnNotice = '';
+let sidebarPointerNavigation = false;
 
 const view = document.querySelector('#view');
 const title = document.querySelector('#pageTitle');
@@ -104,8 +105,13 @@ function setNavActive() {
 }
 
 function clearSidebarFocus() {
-  const focused = document.activeElement?.closest?.('.nav a');
-  if (focused) focused.blur();
+  const blurFocusedNav = () => {
+    const focused = document.activeElement?.closest?.('.nav a');
+    if (focused) focused.blur();
+  };
+  blurFocusedNav();
+  requestAnimationFrame(blurFocusedNav);
+  setTimeout(blurFocusedNav, 80);
 }
 
 function hashTargetId() {
@@ -2129,7 +2135,7 @@ async function backupView() {
         </details>
       </section>`
     : '';
-  const fallbackNotice = !doctorPending && !hasWslToolChecks
+  const fallbackNotice = !doctorPending
     ? `<details class="recovery-details">
         <summary>버튼이 보이지 않거나 막힐 때</summary>
         <p>브라우저를 닫고 압축을 푼 폴더의 1_백업_시작.bat를 다시 더블클릭하세요. Windows가 파일 확장자를 숨기면 1_백업_시작으로 보일 수 있습니다. 보이지 않으면 시작하기 또는 시작하기.bat를 사용해도 됩니다.</p>
@@ -3746,10 +3752,17 @@ async function render() {
   }
 }
 
-document.querySelectorAll('.nav a').forEach((a) => a.addEventListener('click', (event) => {
-  event.preventDefault();
-  navigate(a.getAttribute('href'), { clearSidebarFocus: event.detail > 0 });
-}));
+document.querySelectorAll('.nav a').forEach((a) => {
+  a.addEventListener('pointerdown', () => {
+    sidebarPointerNavigation = true;
+  });
+  a.addEventListener('click', (event) => {
+    event.preventDefault();
+    const clearFocus = sidebarPointerNavigation || event.detail > 0;
+    sidebarPointerNavigation = false;
+    navigate(a.getAttribute('href'), { clearSidebarFocus: clearFocus });
+  });
+});
 window.addEventListener('popstate', render);
 window.addEventListener('hashchange', render);
 refreshBtn.addEventListener('click', render);

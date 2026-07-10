@@ -75,6 +75,7 @@ function navLinkActive(link, path, hash) {
   const url = new URL(link.getAttribute('href') || '/', location.origin);
   if (url.pathname !== path) return false;
   if (path !== '/backup') return true;
+  if (!hash) return url.hash === '#wechat';
   if (hash.startsWith('#wechat')) return url.hash === '#wechat';
   if (hash.startsWith('#kakao')) return url.hash === '#kakao';
   return false;

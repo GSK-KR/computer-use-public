@@ -3562,6 +3562,7 @@ async function render() {
   const fn = routes[routePath()] || dashboardView;
   try {
     await fn();
+    setNavActive();
   } catch (err) {
     if (err.status === 401 && await tryLocalAuth()) {
       render();

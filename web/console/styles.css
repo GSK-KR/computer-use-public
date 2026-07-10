@@ -92,25 +92,20 @@ body {
   gap: 7px;
 }
 
-.nav a.active {
-  background: var(--sidebar-2);
-  border-color: #3c4654;
-  color: #fff;
-}
-
 .nav a:hover {
   background: #29303a;
   color: #fff;
 }
 
-.nav a.nav-wechat {
-  color: #d7dde7;
-}
-
-.nav a.nav-wechat.active {
+.nav a.active,
+.nav a.active:hover {
   background: #1f6f55;
   border-color: #66d1a3;
   color: #fff;
+}
+
+.nav a.nav-wechat {
+  color: #d7dde7;
 }
 
 .nav a.nav-wechat:hover:not(.active) {

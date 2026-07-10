@@ -653,6 +653,10 @@ function inspectPublicPackage(checks) {
     && reportLauncher.includes('채팅 본문, 방 이름, 스크린샷 경로는 보고서에 넣지 않습니다')
     && reportLauncher.includes('아무 값도 입력하지 않습니다')
     && reportLauncher.includes('state\\console_url.txt')
+    && reportLauncher.includes('set "CU_FOUND_URL="')
+    && reportLauncher.includes('findstr /B /C:"http://127.0.0.1:"')
+    && reportLauncher.includes('if defined CU_FOUND_URL set "CU_REPORT_URL=%CU_FOUND_URL%"')
+    && reportLauncher.includes('--url "%CU_REPORT_URL%"')
     && liveAcceptance.includes('computer-use.live-acceptance.v1')
     && liveAcceptance.includes('채팅 본문, 방 이름, 스크린샷 경로는 이 보고서에 포함하지 않습니다.');
   const readinessLauncherOk = readinessLauncher.includes('카카오톡/위챗 백업 준비 보고서를 만듭니다')

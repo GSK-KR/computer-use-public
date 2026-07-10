@@ -3596,6 +3596,7 @@ async function render() {
 document.querySelectorAll('.nav a').forEach((a) => a.addEventListener('click', (event) => {
   event.preventDefault();
   navigate(a.getAttribute('href'));
+  if (event.detail > 0) a.blur();
 }));
 window.addEventListener('popstate', render);
 window.addEventListener('hashchange', render);

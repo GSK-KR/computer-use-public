@@ -270,8 +270,6 @@ function Show-NodeInstallHelp {
 
 function ConvertTo-WslPathSafe {
   param([string]$Path)
-  $r = Invoke-WslText -Args @('-e','wslpath','-u',$Path)
-  if ($r.ok -and -not [string]::IsNullOrWhiteSpace($r.text)) { return $r.text.Trim() }
   return ConvertTo-WslPath $Path
 }
 
@@ -311,13 +309,23 @@ $checks = @()
 $checks += Test-WindowsCommand '백업 화면 실행 도구' 'node.exe'
 $checks += Test-WindowsCommand 'Windows 기본 실행' 'powershell.exe' @('-NoProfile','-Command','$PSVersionTable.PSVersion.ToString()')
 
-$optionalChecks = @()
-$optionalChecks += Test-WslCommand '고급 기능 실행 환경' 'uname -a'
-$optionalChecks += Test-WslCommand '고급 기능 실행 도구' 'node --version'
-$optionalChecks += Test-WslCommand '고급 기능 자료 처리 도구' 'jq --version'
-$optionalChecks += Test-WslCommand '예전 파일 확인 도구' 'sqlite3 --version'
-$optionalChecks += Test-WslCommand '고급 자동 실행 선택 기능' 'codex --version'
-$optionalChecks += Test-WslCommand '고급 자동 실행 선택 기능' 'claude --version'
+$optionalChecks = @(
+  [pscustomobject]@{ name = '고급 기능 실행 환경'; status = 'REVIEW'; detail = '기본 백업에는 없어도 됩니다' },
+  [pscustomobject]@{ name = '고급 기능 실행 도구'; status = 'REVIEW'; detail = '기본 백업에는 없어도 됩니다' },
+  [pscustomobject]@{ name = '고급 기능 자료 처리 도구'; status = 'REVIEW'; detail = '기본 백업에는 없어도 됩니다' },
+  [pscustomobject]@{ name = '예전 파일 확인 도구'; status = 'REVIEW'; detail = '기본 백업에는 없어도 됩니다' },
+  [pscustomobject]@{ name = '고급 자동 실행 선택 기능'; status = 'REVIEW'; detail = '기본 백업에는 없어도 됩니다' },
+  [pscustomobject]@{ name = '고급 자동 실행 선택 기능'; status = 'REVIEW'; detail = '기본 백업에는 없어도 됩니다' }
+)
+if ($env:CU_SHOW_ADVANCED_CHECKS -eq '1') {
+  $optionalChecks = @()
+  $optionalChecks += Test-WslCommand '고급 기능 실행 환경' 'uname -a'
+  $optionalChecks += Test-WslCommand '고급 기능 실행 도구' 'node --version'
+  $optionalChecks += Test-WslCommand '고급 기능 자료 처리 도구' 'jq --version'
+  $optionalChecks += Test-WslCommand '예전 파일 확인 도구' 'sqlite3 --version'
+  $optionalChecks += Test-WslCommand '고급 자동 실행 선택 기능' 'codex --version'
+  $optionalChecks += Test-WslCommand '고급 자동 실행 선택 기능' 'claude --version'
+}
 
 Write-Host "기본 준비 상태"
 foreach ($check in $checks) {

@@ -1561,6 +1561,12 @@ function isConsoleScreenPath(pathname) {
   return /^\/(?:backup|agent|jobs|doctor|chats|settings)(?:\/.*)?$/u.test(pathname);
 }
 
+function consoleScreenRecoveryPath(url) {
+  const backup = url.pathname.match(/^\/backup\/(wechat|kakao)(-full)?\/?$/u);
+  if (backup) return `/backup${url.search || ''}#${backup[1]}${backup[2] || ''}`;
+  return `${url.pathname}${url.search}`;
+}
+
 function sendConsoleScreenRecovery(res) {
   const body = `<!doctype html>
 <html lang="ko">
@@ -1598,7 +1604,7 @@ function recoverConsoleScreenRequest(res, url) {
   const consoleUrl = knownConsoleUrl();
   if (consoleUrl) {
     res.writeHead(302, {
-      location: `${consoleUrl}${url.pathname}${url.search}`,
+      location: `${consoleUrl}${consoleScreenRecoveryPath(url)}`,
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
     });

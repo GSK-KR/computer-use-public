@@ -467,7 +467,23 @@ function contentType(file) {
   }
 }
 
+function nestedBackupRedirectLocation(url) {
+  const match = url.pathname.match(/^\/backup\/(wechat|kakao)(-full)?\/?$/u);
+  if (!match) return '';
+  return `/backup${url.search || ''}#${match[1]}${match[2] || ''}`;
+}
+
 function serveStatic(req, res, url) {
+  const backupRedirect = nestedBackupRedirectLocation(url);
+  if (backupRedirect) {
+    res.writeHead(302, {
+      location: backupRedirect,
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+    });
+    res.end();
+    return;
+  }
   let file = safeStaticPath(url.pathname);
   if (!file || !existsSync(file) || !statSync(file).isFile()) {
     if (/^\/(?:backup|agent|jobs|doctor|chats|settings)\/?$/u.test(url.pathname)) {

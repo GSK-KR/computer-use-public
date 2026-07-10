@@ -434,7 +434,7 @@ function serveStatic(req, res, url) {
   }
   res.writeHead(200, {
     'content-type': contentType(file),
-    'cache-control': file.endsWith('index.html') ? 'no-store' : 'public, max-age=60',
+    'cache-control': 'no-store',
     'x-content-type-options': 'nosniff',
     ...(sameToken(url.searchParams.get('token') || '') ? optionalAuthCookieHeader() : {}),
   });

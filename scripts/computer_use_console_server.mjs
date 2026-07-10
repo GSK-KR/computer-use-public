@@ -448,6 +448,12 @@ function moduleList() {
   }));
 }
 
+function visibleJobs() {
+  const jobs = runner.listJobs();
+  if (catalog.selftest) return jobs;
+  return jobs.filter((job) => job.module !== 'selftest');
+}
+
 function safeStaticPath(urlPath) {
   const raw = decodeURIComponent(urlPath === '/' ? '/index.html' : urlPath);
   const file = resolve(options.staticDir, raw.replace(/^\/+/u, ''));
@@ -746,7 +752,7 @@ async function handleApi(req, res, url) {
     return;
   }
   if (url.pathname === '/api/jobs' && req.method === 'GET') {
-    sendJson(res, 200, { jobs: runner.listJobs() });
+    sendJson(res, 200, { jobs: visibleJobs() });
     return;
   }
   if (url.pathname === '/api/jobs' && req.method === 'POST') {

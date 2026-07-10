@@ -127,20 +127,33 @@ function localPeerAllowed(req) {
   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1' || addr.startsWith('::ffff:127.');
 }
 
-function originAllowed(req) {
-  const origin = req.headers.origin;
+function firstHeader(value) {
+  if (Array.isArray(value)) return value[0] || '';
+  return value || '';
+}
+
+function localOriginAllowed(origin) {
   if (!origin) return true;
   try {
     const parsed = new URL(origin);
-    return (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') && /^https?:$/u.test(parsed.protocol);
+    return ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(parsed.hostname) && /^https?:$/u.test(parsed.protocol);
   } catch {
     return false;
   }
 }
 
-function firstHeader(value) {
-  if (Array.isArray(value)) return value[0] || '';
-  return value || '';
+function originAllowed(req) {
+  return localOriginAllowed(firstHeader(req.headers.origin));
+}
+
+function applyLocalCorsHeaders(req, res) {
+  const origin = firstHeader(req.headers.origin);
+  if (!origin || !localOriginAllowed(origin)) return;
+  res.setHeader('access-control-allow-origin', origin);
+  res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+  res.setHeader('access-control-allow-headers', 'content-type, x-cu-token');
+  res.setHeader('access-control-max-age', '600');
+  res.setHeader('vary', 'Origin');
 }
 
 function cookieValue(req, name) {
@@ -842,6 +855,15 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || `${options.host}:${options.port}`}`);
   if (!localHostAllowed(req) || !originAllowed(req)) {
     sendError(res, 403, '이 컴퓨터에서 연 백업 화면만 사용할 수 있습니다.');
+    return;
+  }
+  applyLocalCorsHeaders(req, res);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+    });
+    res.end();
     return;
   }
   if (redirectCleanLocalTokenUrl(req, res, url)) return;

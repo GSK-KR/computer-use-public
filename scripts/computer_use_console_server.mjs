@@ -605,12 +605,13 @@ async function ensureChatViewer() {
         exited = true;
         if (chatViewer.process === child) chatViewer.process = null;
       });
+      chatViewer.process = child;
       if (await waitForChatViewer(port, () => !exited)) {
-        chatViewer.process = child;
         chatViewer.port = port;
         return port;
       }
       child.kill('SIGTERM');
+      if (chatViewer.process === child) chatViewer.process = null;
     }
     throw new Error('결과 화면을 열 로컬 주소를 준비하지 못했습니다');
   })();

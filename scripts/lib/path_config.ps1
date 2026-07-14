@@ -63,8 +63,8 @@ function Get-ComputerUseConfig {
     wechatDbWin = $wechatDb
     wechatDbWsl = ConvertTo-WslPath $wechatDb
     defaultConsolePort = [int](FirstValue @($env:CU_DEFAULT_CONSOLE_PORT, $json.defaultConsolePort, 8766))
-    chromeCdpPort = [int](FirstValue @($env:CU_CHROME_CDP_PORT, $json.chromeCdpPort, 9222))
+    chromeCdpPort = [int](FirstValue @($env:CU_CHROME_CDP_PORT, $json.chromeCdpPort, 9224))
     agentProvider = FirstValue @($env:CU_AGENT_PROVIDER, $json.agentProvider, 'claude')
-    webCdpScript = FirstValue @($env:CU_WEB_CDP_SCRIPT, $json.webCdpScript)
+    webCdpScript = FirstValue @($env:CU_WEB_CDP_SCRIPT, $json.webCdpScript, (Join-Path $scriptsDir 'chrome_cdp_runner.mjs'))
   }
 }

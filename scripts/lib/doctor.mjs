@@ -114,7 +114,7 @@ const actionGuides = {
     action: '예전 백업 파일이 없어도 지금 열린 위챗 방/왼쪽 목록 백업은 결과 보기에서 볼 수 있습니다. 예전 파일 검사가 필요할 때만 준비하세요.',
   },
   chrome_cdp: {
-    action: '브라우저 자동화가 필요할 때만 Chrome remote debugging을 켜세요. 채팅 백업에는 필수는 아닙니다.',
+    action: '웹 자동화를 시작하면 전용 Windows Chrome이 자동으로 열립니다. 열리지 않을 때만 Google Chrome 설치 여부를 확인한 뒤 다시 실행하세요.',
   },
   gui_apps: {
     action: '백업하려면 카카오톡 또는 위챗을 실행하고 로그인하세요. 설치되어 있지 않으면 먼저 설치한 뒤 백업 화면의 앱 열기 버튼을 누르세요.',
@@ -299,19 +299,46 @@ function imagemagickCheck() {
   return magick;
 }
 
-async function chromeCdpCheck(port) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 900);
-  try {
-    const res = await fetch(`http://127.0.0.1:${port}/json/version`, { signal: controller.signal });
-    if (!res.ok) return check('chrome_cdp', '브라우저 자동화 선택 기능', 'review', '브라우저 자동화 연결을 확인해야 합니다', { port, httpStatus: res.status });
-    const body = await res.json().catch(() => ({}));
-    return check('chrome_cdp', '브라우저 자동화 선택 기능', 'pass', '브라우저 자동화에 연결됐습니다', { browser: body.Browser || '', port });
-  } catch (err) {
-    return check('chrome_cdp', '브라우저 자동화 선택 기능', 'review', '브라우저 자동화가 꺼져 있습니다', { port, error: err.name === 'AbortError' ? 'timeout' : err.message });
-  } finally {
-    clearTimeout(timer);
+function chromeCdpCheck(pathConfig) {
+  const stateFile = join(process.platform === 'win32' ? pathConfig.stateDirWin : pathConfig.stateDirWsl, 'chrome_cdp.json');
+  let state = {};
+  try { state = JSON.parse(readFileSync(stateFile, 'utf8')); } catch {}
+  const statePort = Number(state.port);
+  const port = Number.isInteger(statePort) && statePort >= 1024 && statePort <= 65535
+    ? statePort
+    : pathConfig.chromeCdpPort;
+  const script = [
+    "$ProgressPreference = 'SilentlyContinue'",
+    `try { $v = Invoke-RestMethod -Uri 'http://127.0.0.1:${port}/json/version' -TimeoutSec 1; $v | ConvertTo-Json -Compress; exit 0 } catch { exit 1 }`,
+  ].join('; ');
+  const probe = run('powershell.exe', ['-NoProfile', '-Command', script], { timeout: 4000 });
+  if (!probe.ok) {
+    return check('chrome_cdp', 'Windows Chrome 웹 자동화', 'review', '웹 작업을 시작하면 Windows Chrome이 자동으로 열립니다', {
+      port,
+      autoStart: true,
+    });
   }
+  let version = {};
+  try { version = JSON.parse(firstLine(probe.stdout)); } catch {}
+  const browser = String(version.Browser || '');
+  const userAgent = String(version['User-Agent'] || '');
+  const nativeWindowsChrome = /^Chrome\//u.test(browser)
+    && userAgent.includes('Windows NT')
+    && !userAgent.includes('HeadlessChrome')
+    && !userAgent.includes('X11; Linux');
+  if (!nativeWindowsChrome) {
+    return check('chrome_cdp', 'Windows Chrome 웹 자동화', 'review', 'Windows 화면에 보이는 Chrome이 아닌 연결은 사용하지 않습니다', {
+      browser,
+      port,
+      autoStart: true,
+    });
+  }
+  return check('chrome_cdp', 'Windows Chrome 웹 자동화', 'pass', 'Windows Chrome 자동 실행 연결이 준비됐습니다', {
+    browser,
+    port,
+    visible: state.visible === true,
+    autoStart: true,
+  });
 }
 
 function guiProcessCheck() {
@@ -475,7 +502,7 @@ export async function runDoctor() {
     writableCheck('state_writable', '설정 저장 폴더', stateDir),
     writableCheck('runs_writable', '진행 기록 폴더', runsDir),
     await accessCheck('wechat_db', '예전 위챗 백업 파일', wechatDb),
-    await chromeCdpCheck(pathConfig.chromeCdpPort),
+    chromeCdpCheck(pathConfig),
     guiProcessCheck(),
   ];
   const kakaoAppStatus = appRunningStatus(checks, ['KakaoTalk']);

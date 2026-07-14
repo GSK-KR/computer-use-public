@@ -160,12 +160,7 @@ export function loadPathConfig(options = {}) {
   ]);
   const wechatDbWsl = chooseFile(config, 'wechatDb', 'CU_WECHAT_DB_WSL', 'WECHAT_DB', wslJoin(shotsDirWsl, 'wechat_local.sqlite3'));
 
-  const profileWsl = windowsUserProfileWsl();
-  const profileWin = profileWsl ? wslPathToWindows(profileWsl) : '';
-  const localAppData = env('LOCALAPPDATA') || (profileWin ? `${profileWin}\\AppData\\Local` : '');
-  const webCdpScript = env('CU_WEB_CDP_SCRIPT') || config.webCdpScript || (
-    localAppData ? `${localAppData}\\claude-cdp\\cu_web.mjs` : ''
-  );
+  const webCdpScript = env('CU_WEB_CDP_SCRIPT') || config.webCdpScript || `${scriptsDirWin}\\chrome_cdp_runner.mjs`;
 
   return {
     schema: 'computer-use.path-config.v1',
@@ -189,7 +184,7 @@ export function loadPathConfig(options = {}) {
     wechatDbWsl,
     wechatDbWin: resolveLocalPath(env('CU_WECHAT_DB_WIN') || config.wechatDbWin || wslPathToWindows(wechatDbWsl)),
     defaultConsolePort: Number(env('CU_DEFAULT_CONSOLE_PORT') || config.defaultConsolePort || 8766),
-    chromeCdpPort: Number(env('CU_CHROME_CDP_PORT') || config.chromeCdpPort || 9222),
+    chromeCdpPort: Number(env('CU_CHROME_CDP_PORT') || config.chromeCdpPort || 9224),
     agentProvider: env('CU_AGENT_PROVIDER') || config.agentProvider || 'claude',
     allowCloudOcr: Boolean(config.allowCloudOcr ?? false),
     allowCloudTranslation: Boolean(config.allowCloudTranslation ?? false),

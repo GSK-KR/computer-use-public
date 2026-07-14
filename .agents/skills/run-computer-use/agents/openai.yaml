@@ -1,0 +1,4 @@
+interface:
+  display_name: "Computer-Use Windows 실행"
+  short_description: "Windows 백업과 Chrome 자동화를 안전하게 실행합니다"
+  default_prompt: "$run-computer-use를 사용해 이 폴더의 기능으로 요청한 Windows 작업을 실행하고 결과를 검증해 줘."

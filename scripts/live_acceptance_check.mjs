@@ -433,13 +433,13 @@ function inspectPublicPackage(checks) {
   const launcherText = `${launcher}\n${startLauncher}`;
   const recoveryText = `${startConsole}\n${installWindows}`;
   const fullBackupTextOk = fullListText.includes('여러 방 저장')
-    && fullListText.includes('위챗 통째 백업 확인')
-    && fullListText.includes('카카오톡 통째 백업 확인')
+    && fullListText.includes('위챗 통째 백업')
+    && fullListText.includes('카카오톡 통째 백업')
     && fullListText.includes('통째 백업(왼쪽 목록 전체 순회)')
     && fullListText.includes('앱 창을 앞에 두고 왼쪽 채팅 목록이 보이게')
     && fullListText.includes('전체 목록 확인 준비 완료')
     && fullListText.includes('체크박스를 선택하고 `전체 목록 확인`')
-    && fullListText.includes('목록 백업 실행');
+    && fullListText.includes('확인한 목록 백업');
   const roomSelectionTextOk = fullListText.includes('방 선택 완료')
     && fullListText.includes('방 선택 완료 표시가 필요합니다')
     && fullListText.includes('방 선택 완료 표시로 이동')
@@ -448,15 +448,15 @@ function inspectPublicPackage(checks) {
     && firstGuide.includes('1_백업_시작.bat를 더블클릭')
     && firstGuide.includes('4_준비_보고서.bat와 4_검증_보고서.bat는 지원용 보고서를 만들 때만 사용합니다. 처음 백업 시작 파일이 아닙니다')
     && firstGuide.includes('브라우저를 열기 어려운 상태에서 준비 상태만 보내야 하면 4_준비_보고서.bat를 실행합니다')
-    && firstGuide.includes('첫 화면의 막힐 때만 자세히 보기 안에 있는 위챗 찾기 / 막힐 때 영역에서 검증 보고서를 누르거나, 진행 기록에서 검증 보고서를 누릅니다')
+    && firstGuide.includes('첫 화면의 준비가 안 될 때 또는 진행 기록에서 검증 보고서를 누릅니다')
     && firstGuide.includes('브라우저를 찾기 어려울 때만 4_검증_보고서.bat를 실행합니다')
     && firstGuide.includes('첫 화면에서 위챗 백업, 카카오톡 백업, 결과 보기 중 필요한 작업을 고릅니다')
     && firstGuide.includes('아무 값도 입력하지 않습니다')
-    && readme.includes('Windows에서 더블클릭')
+    && readme.includes('평소에는 매번 `1_백업_시작.bat`를 더블클릭')
     && readme.includes('computer-use-public.zip')
     && readme.includes('검증 보고서')
-    && readme.includes('요청 시간이 초과됐습니다')
-    && readme.includes('브라우저와 검은 창을 닫고')
+    && readme.includes('404 not found')
+    && readme.includes('정상 실행에서는 로컬 토큰 입력란을 사용하지 않습니다')
     && fullBackupTextOk
     && roomSelectionTextOk
     && troubleshootingGuide.includes('카카오톡/위챗 백업 문제 확인')
@@ -476,32 +476,33 @@ function inspectPublicPackage(checks) {
   const initialDashboardRequired = [
     'loading-dashboard',
     '백업할 앱을 선택하세요',
+    '원하는 작업 하나를 누르면 바로 이동합니다',
     '위챗 백업',
     '카카오톡 백업',
-    '위챗 통째 백업 확인',
-    '카카오톡 통째 백업 확인',
-    '통째 백업 순서',
-    '통째 백업은 앱 왼쪽 목록이 보이는 상태에서 전체 목록 확인을 누른 뒤 목록 백업 실행으로 이어집니다',
-    '후보 확인',
-    '목록 백업 실행',
-    '결과 보기와 전체 저장',
-    '내 컴퓨터에 저장',
-    '외부 전송 기본 꺼짐',
-    '입력할 내용 없음',
-    '막힐 때만 자세히 보기',
+    '모든 방 백업',
+    '위챗 통째 백업',
+    '카카오톡 통째 백업',
+    '준비가 안 될 때',
   ];
   const missingInitialDashboard = initialDashboardRequired.filter((text) => !consoleIndex.includes(text));
   const initialDashboardStyleOk = consoleStyles.includes('.loading-panel.loading-dashboard')
     && consoleStyles.includes('.loading-choice')
     && consoleStyles.includes('.loading-action.primary')
-    && consoleStyles.includes('.full-backup-mini-steps');
+    && consoleStyles.includes('.full-backup-strip')
+    && consoleStyles.includes('.home-detail-drawer')
+    && consoleStyles.includes('.nav a.active')
+    && consoleStyles.includes('.nav a:focus-visible')
+    && consoleIndex.includes('data-nav-key="backup-wechat"')
+    && consoleIndex.includes('data-nav-key="backup-kakao"')
+    && consoleIndex.includes('data-nav-key="chats"')
+    && !consoleIndex.includes('nav-wechat');
   addCheck(
     checks,
     'package_initial_dashboard',
     missingInitialDashboard.length === 0 && initialDashboardStyleOk ? 'pass' : 'fail',
     missingInitialDashboard.length === 0 && initialDashboardStyleOk
-      ? '브라우저 준비 중에도 첫 화면에 위챗/카카오톡 백업 선택, 통째 백업 순서, 안전 안내가 보입니다.'
-      : '브라우저 준비 중 첫 화면에 초보자용 백업 선택, 통째 백업 순서, 안전 안내 중 빠진 부분이 있습니다.',
+      ? '브라우저 준비 중에도 첫 화면에 위챗/카카오톡과 통째 백업 선택이 간결하게 보입니다.'
+      : '브라우저 준비 중 첫 화면의 간결한 백업 선택 항목 중 빠진 부분이 있습니다.',
     { missing: missingInitialDashboard, styleOk: initialDashboardStyleOk },
   );
 
@@ -525,20 +526,20 @@ function inspectPublicPackage(checks) {
   const fullListTextOk = (
     (fullListText.includes('카카오톡/위챗 `왼쪽 목록 전체 순회`') || fullListText.includes('카카오톡이나 위챗에서 여러 방을 한 번에 저장'))
     && fullListText.includes('여러 방 저장')
-    && fullListText.includes('위챗 통째 백업 확인')
-    && fullListText.includes('카카오톡 통째 백업 확인')
+    && fullListText.includes('위챗 통째 백업')
+    && fullListText.includes('카카오톡 통째 백업')
     && fullListText.includes('통째 백업(왼쪽 목록 전체 순회)')
     && fullListText.includes('전체 목록 확인 준비 완료')
-    && fullListText.includes('체크하고 전체 목록 확인을 누르면 후보 방 이름을 먼저 보여 줍니다')
+    && fullListText.includes('1. 전체 목록 확인')
+    && fullListText.includes('2. 확인한 목록 백업')
     && fullListText.includes('전체 목록 확인')
-    && fullListText.includes('전체 목록 확인 -> 후보 확인 -> 목록 백업 실행 -> 결과 보기와 전체 저장')
-    && fullListText.includes('목록 백업 실행')
+    && fullListText.includes('확인한 목록 백업')
     && fullListText.includes('먼저 전체 목록 확인이 필요합니다')
-    && fullListText.includes('후보를 찾지 못했다는 카드')
+    && (fullListText.includes('후보를 찾지 못했다는 카드') || fullListText.includes('후보가 없으면'))
     && fullListText.includes('목록 확인 다시')
     && fullListText.includes('상한 늘려 전체 목록 다시 확인')
     && fullListText.includes('가능한 상한을 이미 최대로 올린 상태')
-    && fullListText.includes('현재 후보로 목록 백업 실행')
+    && fullListText.includes('현재 후보 백업')
     && fullListText.includes('확인 필요 방 보기')
     && fullListText.includes('앱 화면을 읽어 순회하는 백업')
     && fullListText.includes('내부 DB를 직접')
@@ -615,7 +616,7 @@ function inspectPublicPackage(checks) {
     && startLauncher.includes('카카오톡/위챗 백업 화면을 준비합니다')
     && launcher.includes('scripts\\백업_화면_실행.bat')
     && startLauncher.includes('scripts\\백업_화면_실행.bat')
-    && launcherText.includes('여러 방을 한 번에 저장하려면 첫 화면의 위챗 통째 백업 확인 또는 카카오톡 통째 백업 확인을 누르세요')
+    && launcherText.includes('여러 방을 한 번에 저장하려면 첫 화면의 위챗 통째 백업 또는 카카오톡 통째 백업을 누르세요')
     && bootstrap.includes('카카오톡/위챗 백업 화면을 여는 중입니다')
     && bootstrap.includes('아무 값도 입력하지 않습니다')
     && directRouteLauncherOk;
@@ -672,11 +673,11 @@ function inspectPublicPackage(checks) {
     { reportLauncherOk, readinessLauncherOk },
   );
 
-  const recoveryOk = recoveryText.includes('여러 방을 한 번에 저장하려면 첫 화면의 위챗 통째 백업 확인 또는 카카오톡 통째 백업 확인을 누릅니다')
+  const recoveryOk = recoveryText.includes('여러 방을 한 번에 저장하려면 첫 화면의 위챗 통째 백업 또는 카카오톡 통째 백업을 누릅니다')
     && recoveryText.includes('누른 뒤 앱 창을 앞에 두고 왼쪽 채팅 목록이 보이게 둡니다')
     && recoveryText.includes('백업 화면의 준비 체크 위치로 이동합니다')
     && recoveryText.includes('앱 창과 왼쪽 목록 준비를 체크한 뒤 전체 목록 확인을 누릅니다')
-    && recoveryText.includes('바로 클릭하지 않고 전체 목록 확인으로 후보 방 이름을 먼저 보여 준 뒤, 후보가 맞을 때 목록 백업 실행으로 이어집니다')
+    && recoveryText.includes('바로 클릭하지 않고 전체 목록 확인으로 후보 방 이름을 먼저 보여 준 뒤, 후보가 맞을 때 확인한 목록 백업으로 이어집니다')
     && recoveryText.includes('위챗 문자 인식 준비가 필요하다고 나오면 백업 화면의 중국어 문자 인식 설치를 먼저 누릅니다')
     && recoveryText.includes('중국어(간체, 중국) 또는 중국어(번체, 대만/홍콩) 중 하나를 기본 선택 그대로 설치하고 문자 인식 기능은 선택 해제하지 않습니다');
   addCheck(
@@ -748,13 +749,15 @@ async function run() {
       '카카오톡 백업',
       '결과 보기',
       'loading-dashboard',
-      '위챗 통째 백업 확인',
-      '카카오톡 통째 백업 확인',
+      '위챗 통째 백업',
+      '카카오톡 통째 백업',
       '백업할 앱을 선택하세요',
-      '내 컴퓨터에 저장',
-      '외부 전송 기본 꺼짐',
-      '통째 백업은 앱 왼쪽 목록이 보이는 상태에서 전체 목록 확인을 누른 뒤 목록 백업 실행으로 이어집니다',
-      '입력할 내용 없음',
+      '원하는 작업 하나를 누르면 바로 이동합니다',
+      '모든 방 백업',
+      '준비가 안 될 때',
+      'data-nav-key="home"',
+      'data-nav-key="backup-wechat"',
+      'data-nav-key="backup-kakao"',
     ];
     const missing = required.filter((value) => !text.includes(value));
     const ok = missing.length === 0;

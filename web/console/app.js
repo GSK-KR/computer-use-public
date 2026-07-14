@@ -461,10 +461,10 @@ function jobActionLabel(job) {
     'chat.audit': '결과 품질 확인',
     'kakao.open_windows': '카카오톡 열린 방 백업',
     'kakao.visible_room': '카카오톡 목록 방 백업',
-    'kakao.visible_batch': job?.params?.allVisible ? '카카오톡 목록 백업 실행' : '카카오톡 왼쪽 목록 백업',
+    'kakao.visible_batch': job?.params?.allVisible ? '카카오톡 확인한 목록 백업' : '카카오톡 왼쪽 목록 백업',
     'kakao.openchat': '카카오톡 오픈채팅 백업',
     'wechat.current_room': '지금 열린 위챗 방 백업',
-    'wechat.visible_batch': job?.params?.allVisible ? '위챗 목록 백업 실행' : '위챗 왼쪽 목록 백업',
+    'wechat.visible_batch': job?.params?.allVisible ? '위챗 확인한 목록 백업' : '위챗 왼쪽 목록 백업',
     'wechat.validate_db': '예전 위챗 백업 파일 검사',
     'selftest.pass': '테스트 확인 작업',
     'selftest.slow': '테스트 실행 작업',
@@ -708,15 +708,6 @@ function compactSetupGuideText(check) {
   return '';
 }
 
-function currentRoomStepsHtml(appLabel, openText, selectText) {
-  return `
-    <ol class="current-room-steps" aria-label="${esc(appLabel)} 지금 열린 방 백업 순서">
-      <li><span>1</span><strong>${esc(openText)}</strong></li>
-      <li><span>2</span><strong>${esc(selectText)}</strong></li>
-      <li><span>3</span><strong>브라우저로 돌아와 선택 완료 표시</strong></li>
-    </ol>`;
-}
-
 function currentRoomConfirmHtml(inputId, errorId, selectedText) {
   return `
     <div class="confirm-block">
@@ -724,7 +715,7 @@ function currentRoomConfirmHtml(inputId, errorId, selectedText) {
         <input id="${esc(inputId)}" type="checkbox">
         <span class="confirm-copy">
           <strong>방 선택 완료, 앱 창 앞에 둠</strong>
-          <small>${esc(selectedText)}. 이 표시를 체크한 뒤 백업 버튼을 누릅니다. 백업이 끝날 때까지 앱 창을 최소화하거나 다른 창으로 가리지 않습니다.</small>
+          <small>${esc(selectedText)}. 백업이 끝날 때까지 창을 가리지 않습니다.</small>
         </span>
       </label>
       <div id="${esc(errorId)}" class="field-error confirm-error" role="alert" hidden></div>
@@ -738,7 +729,7 @@ function batchListConfirmHtml(inputId, errorId, appLabel) {
         <input id="${esc(inputId)}" type="checkbox">
         <span class="confirm-copy">
           <strong>전체 목록 확인 준비 완료</strong>
-          <small>${esc(appLabel)} 앱 창을 앞에 두고 왼쪽 채팅 목록이 보입니다. 이 표시를 체크한 뒤 전체 목록 확인을 누릅니다. 백업이 끝날 때까지 앱 창을 최소화하거나 다른 창으로 가리지 않습니다.</small>
+          <small>${esc(appLabel)} 창을 앞에 두고 왼쪽 채팅 목록을 보이게 했습니다. 확인이 끝날 때까지 창을 가리지 않습니다.</small>
         </span>
       </label>
       <div id="${esc(errorId)}" class="field-error confirm-error" role="alert" hidden></div>
@@ -759,7 +750,7 @@ function localPrivacyStripHtml() {
         <strong>입력할 내용 없음</strong>
         <span>아무 값도 입력하지 않고 같은 화면 안에서 이어집니다.</span>
       </div>
-      <span class="visually-hidden">AI 보정은 선택 기능입니다. 처음 백업은 Windows 문자 인식으로 시작하고, 추가 검수는 필요할 때만 사용합니다. Windows 기본 백업은 고급 실행 환경 없이 시작하고, 앱 화면을 읽어 저장하며 내부 DB를 직접 열지 않습니다. 외부 검수/번역 기능은 기본으로 꺼져 있습니다.</span>
+      <span class="visually-hidden">AI 보정은 선택 기능입니다. 처음 백업은 Windows 문자 인식으로 시작합니다. 외부 검수/번역은 선택 기능이며 기본으로 꺼져 있습니다. Windows 기본 백업은 고급 실행 환경 없이 시작하고 앱 화면을 읽어 저장합니다. 내부 DB는 직접 열지 않습니다.</span>
     </div>`;
 }
 
@@ -857,9 +848,6 @@ async function dashboardView() {
   };
   const kakaoStatus = platformStatus(kakaoReady, '카카오톡', kakaoOcrReady);
   const wechatStatus = platformStatus(wechatReady, '위챗', wechatOcrReady);
-  const primaryOcrAction = !wechatOcrReady
-    ? ocrInstallActionForCheck('windows_ocr_zh')
-    : (!kakaoOcrReady ? ocrInstallActionForCheck('windows_ocr_ko') : ocrInstallActionForCheck('windows_ocr'));
   const readinessText = doctorPending
     ? '준비 상태를 확인하는 중입니다. 기다리지 않아도 위챗 백업 또는 카카오톡 백업을 열 수 있습니다.'
     : fullBackupReady
@@ -873,168 +861,6 @@ async function dashboardView() {
     ? '기본 도구 준비됨'
     : (coreBackupReady ? '준비할 항목 있음' : '먼저 할 일 있음');
   const doctorBadgeClass = doctorPending ? 'ready' : (fullBackupReady ? 'pass' : (coreBackupReady ? 'partial' : 'review'));
-  const ocrText = doctorPending
-    ? '잠시 뒤 자동으로 문자 인식 상태가 갱신됩니다.'
-    : chatOcrReady
-    ? '한국어/중국어 문자 인식 준비가 확인됐습니다.'
-    : kakaoOcrReady
-      ? '한국어 문자 인식은 준비됐고, 위챗용 중국어 문자 인식 확인이 필요합니다.'
-      : wechatOcrReady
-        ? '중국어 문자 인식은 준비됐고, 카카오톡용 한국어 확인이 필요합니다.'
-        : '카카오톡은 한국어, 위챗은 중국어 문자 인식을 사용합니다.';
-  const ocrSettingsButton = doctorPending || chatOcrReady
-    ? ''
-    : `<button data-action="${esc(primaryOcrAction.homeAction)}" class="primary" type="button">${esc(primaryOcrAction.label)}</button>`;
-  const dashboardOcrGuide = doctorPending || chatOcrReady
-    ? ''
-    : `<div class="home-setup-guide">
-        <strong>문자 인식 설정</strong>
-        <p>카카오톡은 한국어, 위챗은 중국어 문자 인식을 사용합니다.</p>
-        ${ocrSetupGuideHtml()}
-      </div>`;
-  const resultButtonClass = doctorPending || coreBackupReady ? 'primary' : '';
-  const homeHint = doctorPending
-    ? '준비 상태를 확인하는 중입니다. 위챗 백업 또는 카카오톡 백업을 먼저 열어도 됩니다.'
-    : !anyChatOcrReady
-    ? '먼저 문자 인식 설정에서 사용할 앱에 맞는 언어 기능을 확인하세요.'
-    : (!kakaoRunning || !wechatRunning)
-      ? '앱이 꺼져 있으면 아래 카드에서 카카오톡 열기 또는 위챗 열기를 누르세요.'
-      : '앱에서 백업할 방을 선택한 뒤 백업 시작을 누르세요.';
-  const nextAction = (() => {
-    if (doctorPending) {
-      return {
-        status: 'ready',
-        title: '지금 할 일',
-        text: '앱에서 방을 선택한 뒤 백업을 시작하세요.',
-        actions: `
-          <button data-action="backup-wechat" class="primary" type="button">위챗 백업</button>
-          <button data-action="open-wechat" type="button">위챗 열기</button>
-          <button data-action="chats" type="button">결과 보기</button>`,
-      };
-    }
-    if (wechatReady) {
-      return {
-        status: 'pass',
-        title: '지금 할 일',
-        text: '위챗 실행과 중국어 문자 인식이 확인됐습니다. 위챗에서 백업할 방을 선택한 뒤 백업을 시작하세요.',
-        actions: `
-          <button data-action="backup-wechat" class="primary" type="button">위챗 백업</button>
-          <button data-action="chats" type="button">결과 보기</button>
-          <button data-action="backup-kakao" type="button">카카오톡 백업</button>`,
-      };
-    }
-    if (kakaoReady && !wechatReady) {
-      const wechatFix = ocrInstallActionForCheck('windows_ocr_zh');
-      const wechatFixAction = wechatOcrReady ? 'open-wechat' : wechatFix.homeAction;
-      const wechatFixLabel = wechatOcrReady ? '위챗 열기' : wechatFix.label;
-      const wechatBlockText = wechatOcrReady
-        ? '위챗은 앱을 열고 로그인하면 이어서 백업할 수 있습니다.'
-        : '위챗은 중국어(간체, 중국) 또는 중국어(번체, 대만/홍콩) 중 하나를 설치하면 이어서 백업할 수 있습니다.';
-      return {
-        status: 'partial',
-        title: '지금 할 일',
-        text: `${wechatBlockText} 카카오톡은 바로 백업할 수 있습니다.`,
-        actions: `
-          <button data-action="${wechatFixAction}" class="primary" type="button">${wechatFixLabel}</button>
-          <button data-action="backup-wechat" type="button">위챗 백업</button>
-          <button data-action="backup-kakao" type="button">카카오톡 백업</button>`,
-      };
-    }
-    if (!wechatOcrReady) {
-      return {
-        status: 'review',
-        title: '지금 할 일',
-        text: '위챗 백업에는 중국어 화면 글자 읽기가 필요합니다. 설정을 열어 중국어(간체, 중국) 또는 중국어(번체, 대만/홍콩) 중 하나를 추가하세요.',
-        actions: `
-          <button data-action="install-ocr-zh" class="primary" type="button">중국어 문자 인식 설치</button>
-          <button data-action="backup-wechat" type="button">위챗 백업</button>
-          <button data-action="doctor" type="button">준비 확인</button>`,
-      };
-    }
-    if (!wechatRunning) {
-      return {
-        status: 'review',
-        title: '지금 할 일',
-        text: '위챗 앱을 열고 로그인한 뒤 백업할 방을 선택하세요. 선택이 끝나면 브라우저로 돌아오면 됩니다.',
-        actions: `
-          <button data-action="open-wechat" class="primary" type="button">위챗 열기</button>
-          <button data-action="backup-wechat" type="button">위챗 백업 화면</button>
-          <button data-action="install-wechat" type="button">공식 설치 페이지</button>`,
-      };
-    }
-    return {
-      status: coreBackupReady ? 'ready' : 'review',
-      title: '지금 할 일',
-      text: '앱에서 백업할 방을 선택한 뒤 위챗 백업 또는 카카오톡 백업을 시작하세요.',
-      actions: `
-        <button data-action="backup-wechat" class="primary" type="button">위챗 백업</button>
-        <button data-action="backup-kakao" type="button">카카오톡 백업</button>
-        <button data-action="refresh-home" type="button">상태 새로고침</button>`,
-    };
-  })();
-  const progressBadge = (state) => ({ pass: '완료', partial: '준비할 항목', review: '확인 필요', ready: '다음 단계' }[state] || '확인');
-  const progressItem = ({ step, state, title, text, actions }) => `
-    <li class="progress-card ${statusClass(state)}">
-      <span class="progress-index">${esc(step)}</span>
-      <div class="progress-body">
-        <div class="progress-title">
-          <strong>${esc(title)}</strong>
-          <span class="badge ${statusClass(state)}">${esc(progressBadge(state))}</span>
-        </div>
-        <p>${esc(text)}</p>
-        <div class="progress-actions">${actions}</div>
-      </div>
-    </li>`;
-  const progressItems = [
-    progressItem({
-      step: '1',
-      state: doctorPending ? 'ready' : (chatOcrReady ? 'pass' : (anyChatOcrReady ? 'partial' : 'review')),
-      title: '문자 인식 준비',
-      text: doctorPending
-        ? '잠시 뒤 자동으로 확인됩니다.'
-        : chatOcrReady
-        ? '한국어/중국어 화면 글자 읽기를 사용할 수 있습니다.'
-        : anyChatOcrReady
-          ? '한쪽 앱은 시작할 수 있고, 다른 앱은 화면에 보이는 언어 설정만 끝내면 됩니다.'
-          : '사용할 앱에 맞는 문자 인식 언어를 확인합니다.',
-      actions: doctorPending
-        ? '<button data-action="refresh-home" type="button">상태 새로고침</button>'
-        : chatOcrReady
-        ? '<button data-action="refresh-home" type="button">상태 새로고침</button>'
-        : `<button data-action="${esc(primaryOcrAction.homeAction)}" class="primary" type="button">${esc(primaryOcrAction.label)}</button>`,
-    }),
-    progressItem({
-      step: '2',
-      state: doctorPending ? 'ready' : ((kakaoRunning || wechatRunning) ? 'pass' : 'review'),
-      title: '앱 열기',
-      text: doctorPending
-        ? '확인 중에도 앱을 먼저 열 수 있습니다.'
-        : (kakaoRunning || wechatRunning) ? '실행 중인 채팅 앱이 확인됐습니다.' : '카카오톡 또는 위챗을 열고 로그인합니다.',
-      actions: `
-        <button data-action="open-kakao" type="button">카카오톡 열기</button>
-        <button data-action="open-wechat" type="button">위챗 열기</button>`,
-    }),
-    progressItem({
-      step: '3',
-      state: doctorPending ? 'ready' : ((kakaoReady || wechatReady) ? 'ready' : 'review'),
-      title: '방 선택 후 백업',
-      text: doctorPending
-        ? '앱에서 방을 선택한 뒤 백업 화면으로 이동합니다.'
-        : (kakaoReady || wechatReady) ? '앱에서 백업할 방을 선택한 뒤 이 브라우저로 돌아옵니다.' : '앱 실행과 문자 인식 준비가 끝나면 백업을 시작합니다.',
-      actions: `
-        <button data-action="backup-wechat" class="${(doctorPending || kakaoReady || wechatReady) ? 'primary' : ''}" type="button">위챗 백업</button>
-        <button data-action="backup-kakao" type="button">카카오톡 백업</button>`,
-    }),
-    progressItem({
-      step: '4',
-      state: 'ready',
-      title: '결과 확인',
-      text: '결과가 비어 있으면 먼저 백업을 실행한 뒤 새로고침합니다.',
-      actions: `
-        <button data-action="chats" class="primary" type="button">결과 보기</button>
-        <button data-action="open-folder" type="button">백업 폴더 열기</button>`,
-    }),
-  ].join('');
   view.innerHTML = `
     <div class="grid">
       <section class="panel span-12 start-panel">
@@ -1042,17 +868,10 @@ async function dashboardView() {
           <div>
             <span class="guide-kicker">처음 화면</span>
             <h2>백업할 앱을 선택하세요</h2>
-            <p>위챗, 카카오톡, 결과 보기 중 필요한 작업만 누르면 됩니다.</p>
+            <p>원하는 작업 하나를 누르면 바로 이동합니다.</p>
             <span class="visually-hidden">백업할 앱을 선택하세요.</span>
           </div>
-          <div class="start-heading-side">
-            <span class="badge ${statusClass(doctorBadgeClass)}">${esc(doctorBadgeText)}</span>
-            <div class="start-shortcuts" aria-label="빠른 시작">
-              <button data-action="backup-wechat" class="primary" type="button">위챗 백업</button>
-              <button data-action="backup-kakao" type="button">카카오톡 백업</button>
-              <button data-action="chats" type="button">결과 보기</button>
-            </div>
-          </div>
+          <span class="badge ${statusClass(doctorBadgeClass)}">${esc(doctorBadgeText)}</span>
         </div>
         <div class="choice-strip" aria-label="백업 선택">
           <button data-action="backup-wechat" class="choice-action primary-choice" type="button">
@@ -1073,35 +892,24 @@ async function dashboardView() {
         </div>
         <div class="full-backup-strip" aria-label="여러 방 통째 백업">
           <div>
-            <strong>여러 방을 한 번에 저장</strong>
-            <span>통째 백업은 전체 목록 확인으로 후보 방을 먼저 본 뒤 실행합니다.</span>
+            <strong>모든 방 백업</strong>
+            <span>목록을 먼저 확인한 뒤 한 번에 저장합니다.</span>
           </div>
           <div class="full-backup-strip-actions">
-            <button data-action="batch-wechat" class="primary" type="button">위챗 통째 백업 확인</button>
-            <button data-action="batch-kakao" type="button">카카오톡 통째 백업 확인</button>
+            <button data-action="batch-wechat" class="primary" type="button">위챗 통째 백업</button>
+            <button data-action="batch-kakao" type="button">카카오톡 통째 백업</button>
           </div>
-          <ol class="full-backup-mini-steps" aria-label="통째 백업 순서">
-            <li><span>1</span><strong>전체 목록 확인</strong></li>
-            <li><span>2</span><strong>후보 확인</strong></li>
-            <li><span>3</span><strong>목록 백업 실행</strong></li>
-            <li><span>4</span><strong>결과 보기와 전체 저장</strong></li>
-          </ol>
         </div>
-        ${localPrivacyStripHtml()}
-        <div class="next-action-panel ${statusClass(nextAction.status)}" aria-label="지금 할 일">
-          <div>
-            <strong>${esc(nextAction.title)}</strong>
-            <p>${esc(nextAction.text)}</p>
-          </div>
-          <div class="next-action-buttons">
-            ${nextAction.actions}
-          </div>
+        <div class="home-status-line ${statusClass(doctorBadgeClass)}" aria-live="polite">
+          <span class="badge ${statusClass(doctorBadgeClass)}">${esc(doctorBadgeText)}</span>
+          <span>${esc(readinessText)}</span>
+          <button data-action="refresh-home" type="button">새로고침</button>
         </div>
         <details class="home-detail-drawer">
           <summary>
             <span>
-              <strong>막힐 때만 자세히 보기</strong>
-              <small>앱 열기, 문자 인식, 저장 위치만 확인합니다.</small>
+              <strong>준비가 안 될 때</strong>
+              <small>앱 실행과 문자 인식 상태를 확인합니다.</small>
             </span>
           </summary>
           <div class="platform-grid">
@@ -1121,75 +929,23 @@ async function dashboardView() {
                 ${platformActions({ ready: kakaoReady, running: kakaoRunning, ocrReady: kakaoOcrReady, openAction: 'open-kakao', installAction: 'install-kakao', backupAction: 'backup-kakao', openLabel: '카카오톡 열기', installLabel: '공식 설치 페이지', ocrAction: 'install-ocr-ko', ocrLabel: '한국어 문자 인식 설치' })}
               </div>
             </section>
-            <section class="platform-card result-card">
-              <span class="badge">읽기 전용</span>
-              <strong>결과 보기</strong>
-              <small>카카오톡/위챗 백업 결과 통합 조회</small>
-              <div class="card-actions">
-                <button data-action="chats" class="primary" type="button">결과 보기</button>
-              </div>
-            </section>
           </div>
-          <ol class="setup-progress" aria-label="백업 진행 체크리스트">
-            ${progressItems}
-          </ol>
-          <div class="method-note" aria-label="기본 사용 기준">
-            <strong>기본 사용 기준</strong>
-            <p>처음 백업은 Windows 문자 인식으로 시작합니다. AI 보정과 외부 검수/번역은 선택 기능이며 기본으로 꺼져 있습니다. 앱 화면을 읽어 저장하고 내부 DB는 직접 열지 않습니다.</p>
-          </div>
+          ${localPrivacyStripHtml()}
           <div class="home-recovery" aria-label="막힐 때 확인">
             <div>
-              <strong>막힐 때</strong>
-              <p>버튼이 막히면 상태 새로고침과 준비 확인을 누릅니다. 오래된 주소처럼 보이면 1_백업_시작.bat를 다시 실행하세요.</p>
+              <strong>문제가 계속될 때</strong>
+              <p>준비 확인에서 막힌 항목만 확인하세요.</p>
             </div>
             <div class="home-recovery-actions">
-              <button data-action="backup-wechat" class="primary" type="button">위챗 백업으로 이동</button>
-              <button data-action="refresh-home" type="button">상태 새로고침</button>
-              <button data-action="doctor" type="button">준비 확인</button>
+              <button data-action="doctor" class="primary" type="button">준비 확인</button>
               <button data-action="readiness-report" type="button">준비 보고서</button>
               <button data-action="jobs" type="button">진행 기록</button>
               <button data-action="validation-report" type="button">검증 보고서</button>
               <button data-action="open-folder" type="button">백업 폴더 열기</button>
             </div>
           </div>
-          <details class="nested-help-drawer">
-            <summary>
-              <span>
-                <strong>사용 순서와 준비 상태</strong>
-                <small>필요할 때만 확인합니다.</small>
-              </span>
-            </summary>
-            <div class="help-columns">
-              <div>
-                <div class="toolbar"><strong>사용 순서</strong></div>
-                <ol class="use-steps">
-                  <li><span>1</span><div><strong>앱을 엽니다</strong><p>위챗 또는 카카오톡에 로그인합니다.</p></div></li>
-                  <li><span>2</span><div><strong>방을 선택합니다</strong><p>앱에서 백업할 방을 누른 뒤 이 브라우저로 돌아옵니다.</p></div></li>
-                  <li><span>3</span><div><strong>백업을 시작합니다</strong><p>처음에는 기본값 그대로 시작합니다.</p></div></li>
-                  <li><span>4</span><div><strong>결과를 확인합니다</strong><p>백업이 끝나면 결과 보기에서 확인합니다.</p></div></li>
-                </ol>
-              </div>
-              <div>
-                <div class="toolbar">
-                  <strong>준비 상태</strong>
-                  <span class="badge ${statusClass(doctorBadgeClass)}">${esc(doctorBadgeText)}</span>
-                </div>
-                <div class="ready-summary">
-                  <strong>${esc(readinessText)}</strong>
-                  <p>${esc(ocrText)} 선택 기능 상태는 준비 확인에서 따로 볼 수 있습니다.</p>
-                  ${dashboardOcrGuide}
-                  <div class="ready-actions">
-                    ${ocrSettingsButton}
-                    <button data-action="refresh-home" type="button">상태 새로고침</button>
-                    <button data-action="doctor" type="button">준비 확인</button>
-                    <button data-action="chats" class="${resultButtonClass}" type="button">결과 보기</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </details>
         </details>
-        <div id="homeLog" class="home-log">${esc(homeHint)}</div>
+        <div id="homeLog" class="home-log" hidden></div>
       </section>
     </div>`;
   view.querySelector('[data-action="jobs"]')?.addEventListener('click', () => navigate('/jobs'));
@@ -1400,7 +1156,10 @@ function watchJobExit(id, { afterExit, activeLabel = '' } = {}) {
 
 async function startHomeSetupJob(action, label, { successMessage, failureMessage } = {}) {
   const log = view.querySelector('#homeLog');
-  if (log) log.textContent = `${label} 중입니다...`;
+  if (log) {
+    log.hidden = false;
+    log.textContent = `${label} 중입니다...`;
+  }
   setActiveJob(label, 'starting');
   try {
     const { job } = await api('/api/jobs', {
@@ -1592,8 +1351,8 @@ function setBackupNextActions(mode, retryJob = null, options = {}) {
         status: 'ready',
         title: '목록 확인이 끝났습니다',
         text: hasCandidateRooms
-          ? '아래 후보 방이 맞으면 목록 백업 실행을 누르고, 다르면 앱에서 목록 위치를 다시 맞춥니다.'
-          : '번호가 붙은 후보 목록이 맞으면 목록 백업 실행을 누르고, 다르면 앱에서 목록 위치를 다시 맞춥니다.',
+          ? '아래 후보 방이 맞으면 확인한 목록 백업을 누르고, 다르면 앱에서 목록 위치를 다시 맞춥니다.'
+          : '번호가 붙은 후보 목록이 맞으면 확인한 목록 백업을 누르고, 다르면 앱에서 목록 위치를 다시 맞춥니다.',
       };
     }
     if (needSelection) {
@@ -1607,7 +1366,7 @@ function setBackupNextActions(mode, retryJob = null, options = {}) {
       return {
         status: 'review',
         title: '먼저 전체 목록 확인이 필요합니다',
-        text: '목록 백업 실행은 후보 방을 확인한 뒤 시작합니다. 전체 목록 확인으로 번호가 붙은 후보 방 이름을 먼저 확인하세요.',
+        text: '확인한 목록 백업은 후보 방을 확인한 뒤 시작합니다. 전체 목록 확인으로 번호가 붙은 후보 방 이름을 먼저 확인하세요.',
       };
     }
     if (previewListLimit) {
@@ -1669,7 +1428,7 @@ function setBackupNextActions(mode, retryJob = null, options = {}) {
     ? `<button data-next="retry" class="${retryPrimary ? 'primary' : ''}" type="button">${esc(retryJob.buttonLabel || '같은 백업 다시 실행')}</button>`
     : '';
   const alternateButton = canAlternate
-    ? `<button data-next="alternate" class="${previewListLimit && !canRetry ? 'primary' : ''}" type="button">${esc(alternateJob.buttonLabel || '현재 후보로 목록 백업 실행')}</button>`
+    ? `<button data-next="alternate" class="${previewListLimit && !canRetry ? 'primary' : ''}" type="button">${esc(alternateJob.buttonLabel || '현재 후보 백업')}</button>`
     : '';
   const openAppButton = candidateOpenAction
     ? `<button data-next="open-app" class="primary" type="button">${esc(candidateOpenAction.label)}</button>`
@@ -1711,7 +1470,7 @@ function setBackupNextActions(mode, retryJob = null, options = {}) {
     if (line) setTimeout(() => line.classList.remove('attention'), 2200);
   });
   target.querySelector('[data-next="retry"]')?.addEventListener('click', () => startBackupJob(retryJob.module, retryJob.action, retryJob.params || {}, retryJob.label || '백업 다시 실행'));
-  target.querySelector('[data-next="alternate"]')?.addEventListener('click', () => startBackupJob(alternateJob.module, alternateJob.action, alternateJob.params || {}, alternateJob.label || '목록 백업 실행'));
+  target.querySelector('[data-next="alternate"]')?.addEventListener('click', () => startBackupJob(alternateJob.module, alternateJob.action, alternateJob.params || {}, alternateJob.label || '확인한 목록 백업'));
   target.querySelector('[data-next="jobs"]').addEventListener('click', () => navigate('/jobs'));
   target.querySelector('[data-next="chats"]').addEventListener('click', () => navigate('/chats'));
   target.querySelector('[data-next="folder"]').addEventListener('click', () => startBackupJob('setup', 'open_backup_folder', {}, '백업 폴더 열기'));
@@ -1870,8 +1629,8 @@ async function handleBackupJobExit({ module, action, params, label, event, logEl
         module,
         action: 'visible_batch',
         params: batchParams,
-        label: `${platformLabel} 목록 백업 실행`,
-        buttonLabel: '목록 백업 실행',
+        label: `${platformLabel} 확인한 목록 백업`,
+        buttonLabel: '확인한 목록 백업',
       } : null;
       retryPreviewJob = {
         module,
@@ -1886,12 +1645,12 @@ async function handleBackupJobExit({ module, action, params, label, event, logEl
       const retryJob = expandedBatchPreviewJob(module, params, backupLimitKind(logEl?.textContent || ''));
       if (logEl) logEl.textContent += retryJob
         ? '후보는 찾았지만 전체 목록 끝을 확인하지 못했습니다. 상한 늘려 전체 목록 다시 확인을 누른 뒤 후보를 다시 확인하세요.\n'
-        : '후보는 찾았지만 전체 목록 끝을 확인하지 못했습니다. 현재 상한을 더 올릴 수 없으므로 현재 후보로 목록 백업 실행을 누를 수 있습니다.\n';
+        : '후보는 찾았지만 전체 목록 끝을 확인하지 못했습니다. 현재 상한을 더 올릴 수 없으므로 현재 후보 백업을 누를 수 있습니다.\n';
       setBackupNextActions('preview-list-limit', retryJob, { candidates, alternateJob: retryJob ? null : previewJob });
       return;
     }
     if (logEl) logEl.textContent += candidates.count && candidates.rooms?.length
-      ? '목록 확인이 끝났습니다. 아래 후보 방이 맞으면 목록 백업 실행 버튼을 누르세요.\n'
+      ? '목록 확인이 끝났습니다. 아래 후보 방이 맞으면 확인한 목록 백업 버튼을 누르세요.\n'
       : '후보 방을 찾지 못했습니다. 앱의 왼쪽 채팅 목록이 보이게 한 뒤 목록 확인 다시를 누르세요.\n';
     setBackupNextActions(candidates.count > 0 ? 'preview' : 'candidate-empty', candidates.count > 0 ? previewJob : retryPreviewJob, { candidates });
     return;
@@ -1986,12 +1745,6 @@ async function backupView() {
   const checkById = (id) => doctor?.checks?.find((check) => check.id === id);
   const kakaoOcrCheckId = checkById('windows_ocr_ko') ? 'windows_ocr_ko' : 'windows_ocr';
   const wechatOcrCheckId = checkById('windows_ocr_zh') ? 'windows_ocr_zh' : 'windows_ocr';
-  const chatOcrReady = checkById(kakaoOcrCheckId)?.status === 'pass' && checkById(wechatOcrCheckId)?.status === 'pass';
-  const anyChatOcrReady = checkById(kakaoOcrCheckId)?.status === 'pass' || checkById(wechatOcrCheckId)?.status === 'pass';
-  const coreToolReady = ['powershell', 'node', 'shots_writable', 'state_writable', 'runs_writable', 'windows_ocr']
-    .every((id) => checkById(id)?.status === 'pass');
-  const fullBackupReady = coreToolReady && chatOcrReady;
-  const coreBackupReady = coreToolReady && anyChatOcrReady;
   const hasWslToolChecks = Boolean(checkById('wsl_node'));
   const kakaoOpenRequired = ['powershell', kakaoOcrCheckId];
   const kakaoVisibleRequired = ['powershell', kakaoOcrCheckId];
@@ -2023,25 +1776,20 @@ async function backupView() {
   const wechatMissing = [...wechatCurrentToolMissing, ...wechatAppMissing];
   const wechatBatchMissing = [...wechatBatchToolMissing, ...wechatAppMissing];
   const environmentMissing = [...new Map([...kakaoOpenToolMissing, ...kakaoVisibleToolMissing, ...kakaoOpenchatToolMissing, ...wechatCurrentToolMissing, ...wechatBatchToolMissing].map((check) => [check.id, check])).values()];
-  const allMissing = [...new Map([...kakaoMissing, ...kakaoVisibleMissing, ...kakaoOpenchatMissing, ...wechatMissing, ...wechatBatchMissing].map((check) => [check.id, check])).values()];
   const backupHash = hashTargetId();
   const backupTarget = backupHash.startsWith('kakao') ? 'kakao' : (backupHash.startsWith('wechat') ? 'wechat' : '');
   const fullBackupTarget = backupHash === 'kakao-full' ? 'kakao' : (backupHash === 'wechat-full' ? 'wechat' : '');
-  const targetLabel = backupTarget === 'wechat' ? '위챗' : (backupTarget === 'kakao' ? '카카오톡' : '');
-  const targetMissing = backupTarget === 'wechat'
+  const activeBackupTarget = backupTarget || 'wechat';
+  const targetLabel = activeBackupTarget === 'wechat' ? '위챗' : '카카오톡';
+  const targetMissing = activeBackupTarget === 'wechat'
     ? wechatMissing
-    : (backupTarget === 'kakao' ? kakaoMissing : []);
+    : kakaoMissing;
   const backupBadge = (() => {
     if (doctorPending) return { label: '준비 확인 중', status: 'ready' };
     if (!doctor) return { label: '준비 확인 필요', status: 'review' };
-    if (targetLabel) {
-      return targetMissing.length
-        ? { label: `${targetLabel} 준비 확인`, status: 'review' }
-        : { label: `${targetLabel} 백업 가능`, status: 'pass' };
-    }
-    if (fullBackupReady) return { label: '기본 도구 준비됨', status: 'pass' };
-    if (coreBackupReady) return { label: '준비할 항목 있음', status: 'partial' };
-    return { label: '먼저 할 일 있음', status: 'review' };
+    return targetMissing.length
+      ? { label: `${targetLabel} 준비 확인`, status: 'review' }
+      : { label: `${targetLabel} 백업 가능`, status: 'pass' };
   })();
   const doctorBadge = doctor
     ? `<span class="badge ${statusClass(backupBadge.status)}">${esc(backupBadge.label)}</span>`
@@ -2067,7 +1815,6 @@ async function backupView() {
     if (check.id === 'imagemagick') return '이미지 처리 도구 설치 필요';
     return `${check.label} 확인 필요`;
   };
-  const noticeItems = targetMissing.map(backupCheckLabel);
   const kakaoOpenDisabled = kakaoMissing.length ? 'disabled' : '';
   const kakaoVisibleDisabled = kakaoVisibleMissing.length ? 'disabled' : '';
   const kakaoBatchDisabled = kakaoBatchMissing.length ? 'disabled' : '';
@@ -2141,234 +1888,44 @@ async function backupView() {
         <p>브라우저를 닫고 압축을 푼 폴더의 1_백업_시작.bat를 다시 더블클릭하세요. Windows가 파일 확장자를 숨기면 1_백업_시작으로 보일 수 있습니다. 보이지 않으면 시작하기 또는 시작하기.bat를 사용해도 됩니다.</p>
       </details>`
     : '';
-  const fullBackupTargetMissing = fullBackupTarget === 'kakao'
-    ? kakaoBatchMissing
-    : (fullBackupTarget === 'wechat' ? wechatBatchMissing : []);
-  const fullBackupTargetActionText = (() => {
-    if (!fullBackupTarget) return '';
-    if (doctorPending) return '준비 상태를 확인하는 중입니다. 잠시 뒤 상태가 갱신되면 앱 창과 왼쪽 목록 준비를 체크하고 전체 목록 확인으로 후보 방을 먼저 봅니다.';
-    if (!fullBackupTargetMissing.length) return '앱 창을 앞에 두고 왼쪽 채팅 목록이 보이게 한 뒤 전체 목록 확인 준비 완료 체크박스를 선택하세요. 그 다음 전체 목록 확인으로 후보 방을 먼저 봅니다.';
-    if (fullBackupTargetMissing.some(isOcrCheck)) {
-      const action = ocrFixAction(fullBackupTargetMissing);
-      const language = fullBackupTarget === 'wechat' ? '중국어 문자 인식' : '한국어 문자 인식';
-      return `먼저 ${action.label}로 ${language}을 준비한 뒤 상태 새로고침을 누르세요. 준비되면 앱 창과 왼쪽 목록 준비를 체크하고 전체 목록 확인으로 후보 방을 먼저 봅니다.`;
-    }
-    if (fullBackupTargetMissing.some((check) => String(check.id || '').startsWith('app_'))) {
-      return `먼저 ${targetLabel} 열기 또는 공식 설치 페이지로 앱을 열고 로그인하세요. 완료 후 상태 새로고침을 누르면 앱 창과 왼쪽 목록 준비를 체크하고 전체 목록 확인을 시작할 수 있습니다.`;
-    }
-    return '준비 확인에서 막힌 항목을 먼저 해결하세요. 준비되면 앱 창과 왼쪽 목록 준비를 체크하고 전체 목록 확인으로 후보 방을 먼저 봅니다.';
-  })();
-  const batchGuideActionLabel = (platform, missing) => {
-    if (!fullBackupTarget) return `${platform} 통째 백업 확인`;
-    if (doctorPending) return `${platform} 전체 목록 확인 시작`;
-    if (missing.some(isOcrCheck)) return ocrFixAction(missing).label;
-    if (missing.some((check) => String(check.id || '').startsWith('app_'))) return `${platform} 열기`;
-    if (missing.length) return '준비 확인';
-    return `${platform} 전체 목록 확인 시작`;
-  };
-  const fullBackupActionButtons = (() => {
-    if (fullBackupTarget === 'wechat') {
-      return `
-        <button data-batch-starter-wechat class="primary" type="button">${esc(batchGuideActionLabel('위챗', wechatBatchMissing))}</button>
-        <button data-full-backup-switch="kakao" type="button">카카오톡 통째 백업으로 전환</button>`;
-    }
-    if (fullBackupTarget === 'kakao') {
-      return `
-        <button data-batch-starter-kakao class="primary" type="button">${esc(batchGuideActionLabel('카카오톡', kakaoBatchMissing))}</button>
-        <button data-full-backup-switch="wechat" type="button">위챗 통째 백업으로 전환</button>`;
-    }
-    return `
-        <button data-batch-starter-wechat class="primary" type="button">${esc(batchGuideActionLabel('위챗', wechatBatchMissing))}</button>
-        <button data-batch-starter-kakao type="button">${esc(batchGuideActionLabel('카카오톡', kakaoBatchMissing))}</button>`;
-  })();
   const targetNotice = fullBackupTarget
-    ? `<div class="notice focus-notice"><strong>${esc(targetLabel)} 통째 백업 위치입니다.</strong> ${esc(fullBackupTargetActionText)}</div>`
-    : targetLabel
-    ? `<div class="notice focus-notice"><strong>${esc(targetLabel)} 백업 위치입니다.</strong> 앱에서 방을 선택하고 앱 창을 앞에 둔 뒤 이 브라우저로 돌아와 방 선택 완료, 앱 창 앞에 둠 표시를 하고 백업을 누르세요.</div>`
+    ? `<div class="notice focus-notice"><strong>${esc(targetLabel)} 통째 백업</strong> 앱의 왼쪽 채팅 목록을 보이게 둔 뒤 아래 준비 표시부터 진행하세요.</div>`
     : '';
   const returnNotice = backupReturnNotice
     ? `<div class="notice return-notice"><strong>다음 단계</strong> ${esc(backupReturnNotice)}</div>`
     : '';
   backupReturnNotice = '';
-  const notice = noticeItems.length
-    ? `<div class="notice">${esc(noticeItems.join(' · '))}</div>`
-    : (!targetLabel && allMissing.length
-      ? '<div class="notice focus-notice">준비된 카드는 바로 사용할 수 있습니다. 막힌 카드는 카드 아래 안내를 확인하세요.</div>'
-      : '');
   const readinessLine = (label, missing, readyText) => `
     <div class="readiness-line ${doctorPending ? 'status-ready' : (missing.length ? 'status-review' : 'status-pass')}">
       <span>${esc(label)} 준비</span>
-      <small>${doctorPending ? '준비 상태를 확인 중입니다. 기다리지 않아도 지금 열린 방 백업 화면을 열 수 있습니다.' : (missing.length ? esc(missing.map(backupCheckLabel).join(' · ')) : esc(readyText))}</small>
+      <small>${doctorPending ? '상태 확인 중' : (missing.length ? esc(missing.map(backupCheckLabel).join(' · ')) : esc(readyText))}</small>
     </div>`;
-  const starterText = (appName, missing, readyText) => {
-    if (doctorPending) return `${appName} 앱을 열고 방을 선택해도 됩니다. 준비 상태는 곧 갱신됩니다.`;
-    if (!missing.length) return readyText;
-    if (missing.some(isOcrCheck)) {
-      const language = appName === '위챗' ? '중국어(간체, 중국) 또는 중국어(번체, 대만/홍콩) 중 하나' : '한국어';
-      const action = ocrFixAction(missing);
-      return `먼저 ${action.label}를 누른 뒤 ${language}를 기본 선택 그대로 설치하세요.`;
-    }
-    if (missing.some((check) => String(check.id || '').startsWith('app_'))) return `먼저 ${appName} 열기 또는 공식 설치 페이지를 누르고 로그인하세요.`;
-    return '막힌 항목 확인을 누른 뒤 안내된 조치를 먼저 끝내세요.';
-  };
-  const starterCta = (appName, missing) => {
-    if (doctorPending) return '지금 열린 방 백업으로 이동';
-    if (!missing.length) return '선택 완료로 이동';
-    if (missing.some(isOcrCheck)) return ocrFixAction(missing).label;
-    if (missing.some((check) => String(check.id || '').startsWith('app_'))) return `${appName} 열기`;
-    return '막힌 항목 확인';
-  };
-  const firstBackupGuideTarget = backupTarget === 'kakao'
-    ? {
-      key: 'kakao',
-      label: '카카오톡',
-      openLabel: '카카오톡 열기',
-      openAction: 'open_kakaotalk',
-      roomText: '카카오톡에서 백업할 채팅방을 엽니다.',
-      confirmText: '카카오톡에서 백업할 방을 열었다고 표시합니다.',
-      focusSelector: '#kakaoOpenReady',
-      sectionSelector: '#kakao',
-    }
-    : {
-      key: 'wechat',
-      label: '위챗',
-      openLabel: '위챗 열기',
-      openAction: 'open_wechat',
-      roomText: '위챗에서 백업할 방을 선택합니다.',
-      confirmText: '위챗에서 백업할 방을 선택했다고 표시합니다.',
-      focusSelector: '#wechatCurrentReady',
-      sectionSelector: '#wechat',
-    };
-  const firstBackupGuideMissing = firstBackupGuideTarget.key === 'kakao' ? kakaoMissing : wechatMissing;
-  const firstBackupGuidePrimary = !doctorPending && firstBackupGuideMissing.some(isOcrCheck)
-    ? 'ocr'
-    : ((doctorPending || firstBackupGuideMissing.some((check) => String(check.id || '').startsWith('app_')))
-      ? 'open'
-      : 'target');
-  const firstBackupGuideActions = [
-    { key: 'open', attrs: `data-guide-open-app="${esc(firstBackupGuideTarget.openAction)}"`, label: firstBackupGuideTarget.openLabel },
-    { key: 'target', attrs: `data-guide-target-app="${esc(firstBackupGuideTarget.key)}"`, label: '선택 완료 위치로 이동' },
-    { key: 'ocr', attrs: 'data-guide-ocr-settings', label: '문자 인식 설정' },
-  ];
-  const firstBackupGuideActionHtml = [
-    firstBackupGuideActions.find((action) => action.key === firstBackupGuidePrimary),
-    ...firstBackupGuideActions.filter((action) => action.key !== firstBackupGuidePrimary),
-  ].filter(Boolean).map((action) => (
-    `<button ${action.attrs}${action.key === firstBackupGuidePrimary ? ' class="primary"' : ''} type="button">${esc(action.label)}</button>`
-  )).join('');
-  const firstBackupGuideHtml = `
-    <section class="panel span-12 first-backup-guide" aria-label="첫 백업 가이드">
-      <div class="first-backup-copy">
-        <span class="guide-kicker">3분 첫 백업</span>
-        <h2>${esc(firstBackupGuideTarget.label)}용 첫 백업 순서</h2>
-        <p>처음이면 이 순서만 따라가세요. 기술 설정은 막혔을 때만 열면 됩니다.</p>
-      </div>
-      <ol class="first-backup-steps">
-        <li><span>1</span><strong>앱 열기</strong><small>${esc(firstBackupGuideTarget.openLabel)}를 누르고 로그인합니다.</small></li>
-        <li><span>2</span><strong>방 선택</strong><small>${esc(firstBackupGuideTarget.roomText)}</small></li>
-        <li><span>3</span><strong>선택 완료 표시</strong><small>${esc(firstBackupGuideTarget.confirmText)}</small></li>
-        <li><span>4</span><strong>백업 버튼</strong><small>백업을 누르고 끝나면 결과 보기를 엽니다.</small></li>
-      </ol>
-      <div class="first-backup-tip"><strong>백업 중에는 앱 창을 최소화하거나 다른 창으로 가리지 않습니다.</strong><span>화면 글자를 읽어 저장하므로 백업이 끝날 때까지 채팅방이 앞에 보여야 합니다.</span></div>
-      <div class="first-backup-actions">
-        ${firstBackupGuideActionHtml}
-      </div>
-    </section>`;
-  const fullBackupGuideHtml = `
-    <section class="panel span-12 full-backup-guide ${fullBackupTarget ? 'target-focus' : ''}" aria-label="여러 방 통째 백업">
-      <div class="full-backup-copy">
-        <span class="guide-kicker">여러 방 저장</span>
-        <h2>통째 백업은 전체 목록 확인부터 시작합니다</h2>
-        <p>왼쪽 채팅 목록을 끝까지 읽고, 새 방이 더 이상 나오지 않으면 자동으로 멈춥니다.</p>
-      </div>
-      <div class="batch-preflight-note">
-        <strong>시작 전 확인</strong>
-        <span>앱 창을 앞에 두고 왼쪽 채팅 목록이 보이게 둔 뒤 전체 목록 확인을 누르세요. 백업 중에는 앱 창을 가리거나 최소화하지 않습니다.</span>
-      </div>
-      <ol class="full-backup-steps">
-        <li><span>1</span><strong>전체 목록 확인</strong><small>클릭 없이 후보 방 이름을 먼저 봅니다.</small></li>
-        <li><span>2</span><strong>후보 확인</strong><small>번호가 붙은 후보가 맞는지 확인합니다.</small></li>
-        <li><span>3</span><strong>목록 백업 실행</strong><small>맞으면 완료 카드의 실행 버튼을 누릅니다.</small></li>
-        <li><span>4</span><strong>끝 판정</strong><small>상한이나 확인 필요 방은 같은 카드에 표시됩니다.</small></li>
-      </ol>
-      <div class="full-backup-actions">
-        ${fullBackupActionButtons}
-      </div>
-    </section>`;
   const kakaoReadyText = '카카오톡 실행과 한국어 문자 인식이 확인됐습니다';
   const wechatReadyText = '위챗 실행과 중국어 문자 인식이 확인됐습니다';
   setChrome('위챗/카카오톡 백업', '백업과 결과 확인을 같은 화면에서 진행합니다');
   view.innerHTML = `
     <div class="grid">
-      ${firstBackupGuideHtml}
-
-      <section class="panel span-12 backup-head">
-        <div class="toolbar">
-          <strong>위챗 / 카카오톡 백업</strong>
+      <section class="panel span-12 backup-head compact-backup-head">
+        <div class="backup-switcher" aria-label="백업할 앱 선택">
+          <button data-jump-backup="wechat" class="${activeBackupTarget === 'wechat' ? 'primary' : ''}" type="button">위챗</button>
+          <button data-jump-backup="kakao" class="${activeBackupTarget === 'kakao' ? 'primary' : ''}" type="button">카카오톡</button>
+          <button data-jump-backup="chats" type="button">결과 보기</button>
+        </div>
+        <div class="compact-backup-actions">
           ${doctorBadge}
           <button id="backupDoctor" type="button">준비 확인</button>
           <button id="backupJobs" type="button">진행 기록</button>
-          <button id="backupChats" class="primary" type="button">결과 보기</button>
         </div>
-        ${targetNotice}
         ${returnNotice}
-        ${notice}
-        ${fallbackNotice}
-        <div class="backup-switcher" aria-label="백업 종류 바로가기">
-          <button data-jump-backup="wechat" class="${backupTarget === 'wechat' ? 'primary' : ''}" type="button">위챗 백업</button>
-          <button data-jump-backup="kakao" class="${backupTarget === 'kakao' ? 'primary' : ''}" type="button">카카오톡 백업</button>
-          <button data-jump-backup="chats" type="button">결과 보기</button>
-        </div>
-        <div class="step-strip" aria-label="백업 진행 순서">
-          <strong>진행 순서</strong>
-          <ol>
-            <li><span>1</span>앱 실행</li>
-            <li><span>2</span>대상 방 선택</li>
-            <li><span>3</span>백업 시작</li>
-            <li><span>4</span>결과 보기</li>
-          </ol>
-        </div>
       </section>
-
-      <section class="panel span-12 backup-privacy-panel">
-        ${localPrivacyStripHtml()}
-      </section>
-
-      <section class="panel span-12 beginner-backup">
-        <div class="section-heading compact">
-          <div>
-            <h2>처음이면 지금 열린 방 백업부터 시작하세요</h2>
-            <p>앱에서 원하는 방을 열어 둔 뒤, 아래 추천 버튼으로 선택 완료 표시까지 이동합니다.</p>
-          </div>
-          <span class="badge">추천 경로</span>
-        </div>
-        <div class="starter-grid">
-          <button data-starter-wechat class="primary-starter wechat-starter" type="button">
-            <span class="badge ${statusClass(wechatMissing.length ? 'review' : 'pass')}">${wechatMissing.length ? '준비 확인' : '추천'}</span>
-            <strong>지금 열린 위챗 방 백업</strong>
-            <span>${esc(starterText('위챗', wechatMissing, '위챗에서 방을 선택한 뒤 브라우저로 돌아와 확인하고 백업합니다.'))}</span>
-            <span class="starter-cta">${esc(starterCta('위챗', wechatMissing))}</span>
-          </button>
-          <button data-starter-kakao class="kakao-starter" type="button">
-            <span class="badge ${statusClass(kakaoMissing.length ? 'review' : 'pass')}">${kakaoMissing.length ? '준비 확인' : '추천'}</span>
-            <strong>카카오톡 열린 방 백업</strong>
-            <span>${esc(starterText('카카오톡', kakaoMissing, '카카오톡에서 방을 연 뒤 브라우저로 돌아와 확인하고 백업합니다.'))}</span>
-            <span class="starter-cta">${esc(starterCta('카카오톡', kakaoMissing))}</span>
-          </button>
-          <button data-quick-chats type="button"><strong>결과 확인</strong><span>백업 결과를 한 번에 보기</span><span class="starter-cta">결과 보기</span></button>
-          <button data-quick-ready type="button"><strong>막힌 항목 확인</strong><span>설치와 문자 인식 상태만 점검</span><span class="starter-cta">준비 확인 열기</span></button>
-        </div>
-      </section>
-
-      ${fullBackupGuideHtml}
 
       ${captureNotice}
 
-      <section id="wechat" class="panel span-6 workflow-panel wechat-workflow ${backupTarget === 'wechat' ? 'target-focus' : ''}">
+      <section id="wechat" class="panel span-12 workflow-panel wechat-workflow ${activeBackupTarget === 'wechat' ? 'target-focus' : ''}" ${activeBackupTarget === 'wechat' ? '' : 'hidden'}>
         <div class="section-heading">
           <div>
             <h2>위챗 백업</h2>
-            <p>지금 열린 방과 왼쪽 목록 전체 순회(통째 백업)를 화면 문자 인식으로 백업합니다</p>
+            <p>지금 열린 방 또는 왼쪽 목록 전체를 저장합니다.</p>
           </div>
           <span class="badge">앱 화면 읽기</span>
         </div>
@@ -2376,53 +1933,61 @@ async function backupView() {
         <div class="app-quick-actions">
           ${ocrFixButton(wechatMissing)}
           <button id="openWechatApp" type="button">위챗 열기</button>
-          <button id="installWechatApp" type="button">공식 설치 페이지</button>
+          ${wechatAppMissing.length ? '<button id="installWechatApp" type="button">공식 설치 페이지</button>' : ''}
           <button type="button" data-refresh-ready>상태 새로고침</button>
         </div>
 
-        <div class="backup-row">
-          <div>
-            <strong>지금 열린 위챗 방</strong>
-            <p>위챗에서 열어 둔 대화방을 내 컴퓨터에 백업</p>
-          </div>
-          <button id="wechatCurrent" class="primary" type="button" ${wechatCurrentDisabled} ${disabledTitle(wechatMissing)}>백업</button>
-        </div>
-        ${currentRoomStepsHtml('위챗', '위챗 열기', '백업할 방 선택')}
-        ${currentRoomConfirmHtml('wechatCurrentReady', 'wechatCurrentReadyError', '위챗에서 백업할 방을 선택했고 위챗 창을 앞에 두었습니다')}
-        ${blockedNote(wechatMissing)}
-        <details class="advanced-options">
-          <summary>고급 옵션</summary>
-          <div class="field-grid">
-            <label>방 이름<input id="wechatRoomLabel" type="text" maxlength="120" placeholder="비워 두면 화면에서 추정"></label>
-            <label>상대 이름<input id="wechatIncomingSpeaker" type="text" maxlength="120" placeholder="비워 두면 자동"></label>
-            <label>캡처 수<input id="wechatCurrentFrames" type="number" min="1" max="800" value="120"></label>
-          </div>
-        </details>
+        ${targetNotice}
+        <div class="workflow-task-list ${fullBackupTarget === 'wechat' ? 'batch-first' : ''}">
+          <section class="workflow-task current-room-task">
+            <div class="backup-row">
+              <div>
+                <strong>지금 열린 방</strong>
+                <p>위챗에서 방을 선택하고 위챗 창을 앞에 둡니다.</p>
+              </div>
+            </div>
+            ${currentRoomConfirmHtml('wechatCurrentReady', 'wechatCurrentReadyError', '위챗에서 백업할 방을 선택했고 위챗 창을 앞에 두었습니다')}
+            ${blockedNote(wechatMissing)}
+            <div class="task-actions">
+              <button id="wechatCurrent" class="primary" type="button" ${wechatCurrentDisabled} ${disabledTitle(wechatMissing)}>지금 열린 방 백업</button>
+            </div>
+            <details class="advanced-options">
+              <summary>고급 옵션</summary>
+              <div class="field-grid">
+                <label>방 이름<input id="wechatRoomLabel" type="text" maxlength="120" placeholder="비워 두면 화면에서 추정"></label>
+                <label>상대 이름<input id="wechatIncomingSpeaker" type="text" maxlength="120" placeholder="비워 두면 자동"></label>
+                <label>캡처 수<input id="wechatCurrentFrames" type="number" min="1" max="800" value="120"></label>
+              </div>
+            </details>
+          </section>
 
-        <div class="backup-row with-fields">
-          <div>
-            <strong>통째 백업(왼쪽 목록 전체 순회)</strong>
-            <p>위챗 왼쪽 목록을 끝까지 스크롤하며 새 방이 안 나올 때까지 백업합니다</p>
-          </div>
-          <div class="row-actions">
-            <button id="wechatBatchPreview" class="primary" type="button" ${wechatBatchDisabled} ${disabledTitle(wechatBatchMissing)}>전체 목록 확인</button>
-            <button id="wechatBatch" type="button" ${wechatBatchDisabled} ${disabledTitle(wechatBatchMissing)}>목록 백업 실행</button>
-          </div>
+          <section class="workflow-task batch-room-task">
+            <div class="backup-row">
+              <div>
+                <strong>통째 백업</strong>
+                <p>왼쪽 목록을 끝까지 확인하고 여러 방을 차례로 저장합니다.</p>
+              </div>
+            </div>
+            ${batchListConfirmHtml('wechatBatchReady', 'wechatBatchReadyError', '위챗')}
+            ${blockedNote(wechatBatchMissing)}
+            <div class="task-actions">
+              <button id="wechatBatchPreview" class="primary" type="button" ${wechatBatchDisabled} ${disabledTitle(wechatBatchMissing)}>1. 전체 목록 확인</button>
+              <button id="wechatBatch" type="button" ${wechatBatchDisabled} ${disabledTitle(wechatBatchMissing)}>2. 확인한 목록 백업</button>
+            </div>
+            <p class="helper-note">후보 방을 확인한 뒤 두 번째 버튼을 누릅니다. 일시 실패한 방은 기본 1회 다시 시도합니다.</p>
+            <details class="advanced-options">
+              <summary>고급 옵션</summary>
+              <div class="field-grid">
+                <label>페이지 상한<input id="wechatPages" type="number" min="1" max="200" value="80"></label>
+                <label>방 개수 상한<input id="wechatRoomLimit" type="number" min="1" max="500" value="200"></label>
+                <label>캡처 수<input id="wechatBatchFrames" type="number" min="1" max="800" value="120"></label>
+                <label>방 재시도 횟수<input id="wechatRoomRetries" type="number" min="0" max="5" value="1"></label>
+                <label class="check-label"><input id="wechatDirectAuto" type="checkbox" checked> 1:1방 이름 자동 적용</label>
+                <label class="check-label"><input id="wechatAllVisible" type="checkbox" checked> 끝까지 자동 스크롤</label>
+              </div>
+            </details>
+          </section>
         </div>
-        <p class="helper-note">위챗 앱 창을 앞에 두고 왼쪽 목록이 보이게 둡니다. 전체 목록 확인으로 후보를 본 뒤 맞으면 목록 백업 실행을 누릅니다. 방 하나가 일시적으로 실패하면 기본 1회 다시 시도합니다.</p>
-        ${batchListConfirmHtml('wechatBatchReady', 'wechatBatchReadyError', '위챗')}
-        ${blockedNote(wechatBatchMissing)}
-        <details class="advanced-options">
-          <summary>고급 옵션</summary>
-          <div class="field-grid">
-            <label>페이지 상한<input id="wechatPages" type="number" min="1" max="200" value="80"></label>
-            <label>방 개수 상한<input id="wechatRoomLimit" type="number" min="1" max="500" value="200"></label>
-            <label>캡처 수<input id="wechatBatchFrames" type="number" min="1" max="800" value="120"></label>
-            <label>방 재시도 횟수<input id="wechatRoomRetries" type="number" min="0" max="5" value="1"></label>
-            <label class="check-label"><input id="wechatDirectAuto" type="checkbox" checked> 1:1방 이름 자동 적용</label>
-            <label class="check-label"><input id="wechatAllVisible" type="checkbox" checked> 끝까지 자동 스크롤</label>
-          </div>
-        </details>
 
         <details class="advanced-options">
           <summary>고급: 예전 위챗 백업 파일 검사</summary>
@@ -2437,11 +2002,11 @@ async function backupView() {
         </details>
       </section>
 
-      <section id="kakao" class="panel span-6 workflow-panel kakao-workflow ${backupTarget === 'kakao' ? 'target-focus' : ''}">
+      <section id="kakao" class="panel span-12 workflow-panel kakao-workflow ${activeBackupTarget === 'kakao' ? 'target-focus' : ''}" ${activeBackupTarget === 'kakao' ? '' : 'hidden'}>
         <div class="section-heading">
           <div>
             <h2>카카오톡 백업</h2>
-            <p>열린 방, 왼쪽 목록, 오픈채팅을 화면 문자 인식으로 백업합니다</p>
+            <p>지금 열린 방 또는 왼쪽 목록 전체를 저장합니다.</p>
           </div>
           <span class="badge">앱 화면 읽기</span>
         </div>
@@ -2449,53 +2014,63 @@ async function backupView() {
         <div class="app-quick-actions">
           ${ocrFixButton(kakaoMissing)}
           <button id="openKakaoApp" type="button">카카오톡 열기</button>
-          <button id="installKakaoApp" type="button">공식 설치 페이지</button>
+          ${kakaoAppMissing.length ? '<button id="installKakaoApp" type="button">공식 설치 페이지</button>' : ''}
           <button type="button" data-refresh-ready>상태 새로고침</button>
         </div>
 
-        <div class="backup-row">
-          <div>
-            <strong>열린 채팅방</strong>
-            <p>현재 떠 있는 채팅창을 그대로 백업</p>
-          </div>
-          <button id="kakaoOpen" class="primary" type="button" ${kakaoOpenDisabled} ${disabledTitle(kakaoMissing)}>백업</button>
-        </div>
-        ${currentRoomStepsHtml('카카오톡', '카카오톡 열기', '백업할 방 열기')}
-        ${currentRoomConfirmHtml('kakaoOpenReady', 'kakaoOpenReadyError', '카카오톡에서 백업할 방을 열었고 카카오톡 창을 앞에 두었습니다')}
-        ${blockedNote(kakaoMissing)}
-        <details class="advanced-options">
-          <summary>고급 옵션</summary>
-          <div class="field-grid compact">
-            <label>캡처 수<input id="kakaoOpenFrames" type="number" min="1" max="500" value="40"></label>
-            <label class="check-label"><input id="kakaoOpenBottom" type="checkbox" checked> 아래까지 스크롤</label>
-          </div>
-        </details>
+        ${targetNotice}
+        <div class="workflow-task-list ${fullBackupTarget === 'kakao' ? 'batch-first' : ''}">
+          <section class="workflow-task current-room-task">
+            <div class="backup-row">
+              <div>
+                <strong>지금 열린 방</strong>
+                <p>카카오톡에서 방을 열고 카카오톡 창을 앞에 둡니다.</p>
+              </div>
+            </div>
+            ${currentRoomConfirmHtml('kakaoOpenReady', 'kakaoOpenReadyError', '카카오톡에서 백업할 방을 열었고 카카오톡 창을 앞에 두었습니다')}
+            ${blockedNote(kakaoMissing)}
+            <div class="task-actions">
+              <button id="kakaoOpen" class="primary" type="button" ${kakaoOpenDisabled} ${disabledTitle(kakaoMissing)}>지금 열린 방 백업</button>
+            </div>
+            <details class="advanced-options">
+              <summary>고급 옵션</summary>
+              <div class="field-grid compact">
+                <label>캡처 수<input id="kakaoOpenFrames" type="number" min="1" max="500" value="40"></label>
+                <label class="check-label"><input id="kakaoOpenBottom" type="checkbox" checked> 아래까지 스크롤</label>
+              </div>
+            </details>
+          </section>
 
-        <div class="backup-row with-fields">
-          <div>
-            <strong>통째 백업(왼쪽 목록 전체 순회)</strong>
-            <p>카카오톡 왼쪽 목록을 끝까지 스크롤하며 새 방이 안 나올 때까지 백업합니다</p>
-          </div>
-          <div class="row-actions">
-            <button id="kakaoBatchPreview" class="primary" type="button" ${kakaoBatchDisabled} ${disabledTitle(kakaoBatchMissing)}>전체 목록 확인</button>
-            <button id="kakaoBatch" type="button" ${kakaoBatchDisabled} ${disabledTitle(kakaoBatchMissing)}>목록 백업 실행</button>
-          </div>
+          <section class="workflow-task batch-room-task">
+            <div class="backup-row">
+              <div>
+                <strong>통째 백업</strong>
+                <p>왼쪽 목록을 끝까지 확인하고 여러 방을 차례로 저장합니다.</p>
+              </div>
+            </div>
+            ${batchListConfirmHtml('kakaoBatchReady', 'kakaoBatchReadyError', '카카오톡')}
+            ${blockedNote(kakaoBatchMissing)}
+            <div class="task-actions">
+              <button id="kakaoBatchPreview" class="primary" type="button" ${kakaoBatchDisabled} ${disabledTitle(kakaoBatchMissing)}>1. 전체 목록 확인</button>
+              <button id="kakaoBatch" type="button" ${kakaoBatchDisabled} ${disabledTitle(kakaoBatchMissing)}>2. 확인한 목록 백업</button>
+            </div>
+            <p class="helper-note">후보 방을 확인한 뒤 두 번째 버튼을 누릅니다. 일시 실패한 방은 기본 1회 다시 시도합니다.</p>
+            <details class="advanced-options">
+              <summary>고급 옵션</summary>
+              <div class="field-grid">
+                <label>페이지 상한<input id="kakaoPages" type="number" min="1" max="200" value="80"></label>
+                <label>방 개수 상한<input id="kakaoRoomLimit" type="number" min="1" max="500" value="200"></label>
+                <label>캡처 수<input id="kakaoBatchFrames" type="number" min="1" max="500" value="120"></label>
+                <label>방 재시도 횟수<input id="kakaoRoomRetries" type="number" min="0" max="5" value="1"></label>
+                <label class="check-label"><input id="kakaoBatchBottom" type="checkbox" checked> 아래까지 스크롤</label>
+                <label class="check-label"><input id="kakaoAllVisible" type="checkbox" checked> 끝까지 자동 스크롤</label>
+              </div>
+            </details>
+          </section>
         </div>
-        <p class="helper-note">카카오톡 앱 창을 앞에 두고 왼쪽 목록이 보이게 둡니다. 전체 목록 확인으로 후보를 본 뒤 맞으면 목록 백업 실행을 누릅니다. 방마다 기본 120장까지 읽고, 일시 실패는 기본 1회 다시 시도합니다.</p>
-        ${batchListConfirmHtml('kakaoBatchReady', 'kakaoBatchReadyError', '카카오톡')}
-        ${blockedNote(kakaoBatchMissing)}
-        <details class="advanced-options">
-          <summary>고급 옵션</summary>
-          <div class="field-grid">
-            <label>페이지 상한<input id="kakaoPages" type="number" min="1" max="200" value="80"></label>
-            <label>방 개수 상한<input id="kakaoRoomLimit" type="number" min="1" max="500" value="200"></label>
-            <label>캡처 수<input id="kakaoBatchFrames" type="number" min="1" max="500" value="120"></label>
-            <label>방 재시도 횟수<input id="kakaoRoomRetries" type="number" min="0" max="5" value="1"></label>
-            <label class="check-label"><input id="kakaoBatchBottom" type="checkbox" checked> 아래까지 스크롤</label>
-            <label class="check-label"><input id="kakaoAllVisible" type="checkbox" checked> 끝까지 자동 스크롤</label>
-          </div>
-        </details>
 
+        <details class="advanced-options optional-backup-tools">
+          <summary>방 이름 검색·오픈채팅 백업</summary>
         <div class="backup-row with-fields">
           <div>
             <strong>목록에서 찾기</strong>
@@ -2535,6 +2110,7 @@ async function backupView() {
             <label class="check-label"><input id="kakaoOpenchatBottom" type="checkbox" checked> 아래까지 스크롤</label>
           </div>
         </details>
+        </details>
       </section>
 
       <section class="panel span-12 backup-progress-panel">
@@ -2546,12 +2122,12 @@ async function backupView() {
         <div id="backupLog" class="log backup-log-empty">백업을 시작하면 진행 내용이 여기에 표시됩니다.
 처음이면 위의 지금 열린 방 백업 카드에서 방 선택 완료, 앱 창 앞에 둠 체크박스를 먼저 선택하세요.</div>
         <div id="backupNextActions" class="next-actions"></div>
+        ${fallbackNotice}
       </section>
     </div>`;
 
   view.querySelector('#backupDoctor').addEventListener('click', () => navigate('/doctor'));
   view.querySelector('#backupJobs').addEventListener('click', () => navigate('/jobs'));
-  view.querySelector('#backupChats').addEventListener('click', () => navigate('/chats'));
   view.querySelector('#backupOpenJobs').addEventListener('click', () => navigate('/jobs'));
   view.querySelector('#backupOpenChats').addEventListener('click', () => navigate('/chats'));
   view.querySelectorAll('[data-open-language-settings]').forEach((button) => button.addEventListener('click', () => startBackupJob('setup', 'open_language_settings', {}, '문자 인식 설정 열기')));
@@ -2563,124 +2139,12 @@ async function backupView() {
     if (target === 'chats') navigate('/chats');
     else navigate(`/backup#${target}`);
   }));
-  view.querySelectorAll('[data-full-backup-switch]').forEach((button) => button.addEventListener('click', () => {
-    const target = button.dataset.fullBackupSwitch;
-    if (target === 'kakao' || target === 'wechat') navigate(`/backup#${target}-full`);
-  }));
-  const jumpToBackupTarget = (sectionSelector, focusSelector, message) => {
-    view.querySelector(sectionSelector)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    const log = view.querySelector('#backupLog');
-    if (log) log.textContent = `${message}\n`;
-    setTimeout(() => {
-      const input = view.querySelector(focusSelector);
-      const line = input?.closest('.confirm-line');
-      input?.focus();
-      line?.classList.add('attention');
-      if (line) setTimeout(() => line.classList.remove('attention'), 2200);
-    }, 250);
-  };
-  view.querySelectorAll('[data-guide-open-app]').forEach((button) => button.addEventListener('click', () => {
-    const action = button.dataset.guideOpenApp;
-    const label = action === 'open_kakaotalk' ? '카카오톡 열기' : '위챗 열기';
-    startBackupJob('setup', action, {}, label);
-  }));
-  view.querySelectorAll('[data-guide-target-app]').forEach((button) => button.addEventListener('click', () => {
-    if (button.dataset.guideTargetApp === 'kakao') {
-      jumpToBackupTarget('#kakao', '#kakaoOpenReady', '카카오톡에서 백업할 방을 열고 카카오톡 창을 앞에 둔 뒤 방 선택 완료, 앱 창 앞에 둠 표시를 하고 백업을 누르세요.');
-      return;
-    }
-    jumpToBackupTarget('#wechat', '#wechatCurrentReady', '위챗에서 백업할 방을 선택하고 위챗 창을 앞에 둔 뒤 방 선택 완료, 앱 창 앞에 둠 표시를 하고 백업을 누르세요.');
-  }));
-  view.querySelectorAll('[data-guide-ocr-settings]').forEach((button) => button.addEventListener('click', () => {
-    startBackupJob('setup', 'open_language_settings', {}, '문자 인식 설정 열기');
-  }));
-  const starterAction = ({ missing, sectionSelector, focusSelector, readyMessage, openAction, openLabel }) => {
-    if (!doctorPending && missing.some(isOcrCheck)) {
-      const action = ocrFixAction(missing);
-      startBackupJob('setup', action.action, {}, action.label);
-      return;
-    }
-    if (!doctorPending && missing.some((check) => String(check.id || '').startsWith('app_'))) {
-      startBackupJob('setup', openAction, {}, openLabel);
-      return;
-    }
-    if (!doctorPending && missing.length) {
-      navigate('/doctor');
-      return;
-    }
-    jumpToBackupTarget(sectionSelector, focusSelector, readyMessage);
-  };
-  const batchStarterAction = ({ missing, sectionSelector, readySelector, platformLabel, openAction, openLabel }) => {
-    if (!doctorPending && missing.some(isOcrCheck)) {
-      const action = ocrFixAction(missing);
-      startBackupJob('setup', action.action, {}, action.label);
-      return;
-    }
-    if (!doctorPending && missing.some((check) => String(check.id || '').startsWith('app_'))) {
-      startBackupJob('setup', openAction, {}, openLabel);
-      return;
-    }
-    if (!doctorPending && missing.length) {
-      navigate('/doctor');
-      return;
-    }
-    view.querySelector(sectionSelector)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    const log = view.querySelector('#backupLog');
-    if (!stopBtn.disabled) {
-      if (log) log.textContent = '이미 실행 중인 작업이 있습니다. 끝난 뒤 전체 목록 확인 준비 표시를 다시 확인해 주세요.\n';
-      return;
-    }
-    if (log) {
-      log.textContent = `${platformLabel} 앱 창을 앞에 두고 왼쪽 채팅 목록이 보이게 한 뒤 전체 목록 확인 준비 완료를 체크하고 전체 목록 확인을 누르세요.\n`;
-    }
-    setTimeout(() => {
-      const input = view.querySelector(readySelector);
-      const line = input?.closest('.confirm-line');
-      input?.focus();
-      line?.classList.add('attention');
-      if (line) setTimeout(() => line.classList.remove('attention'), 2200);
-    }, 250);
-  };
-  view.querySelector('[data-starter-kakao]')?.addEventListener('click', () => starterAction({
-    missing: kakaoMissing,
-    sectionSelector: '#kakao',
-    focusSelector: '#kakaoOpenReady',
-    readyMessage: '카카오톡에서 백업할 방을 열고 카카오톡 창을 앞에 둔 뒤 이 브라우저로 돌아와 방 선택 완료, 앱 창 앞에 둠 표시를 하고 백업을 누르세요.',
-    openAction: 'open_kakaotalk',
-    openLabel: '카카오톡 열기',
-  }));
-  view.querySelector('[data-starter-wechat]')?.addEventListener('click', () => starterAction({
-    missing: wechatMissing,
-    sectionSelector: '#wechat',
-    focusSelector: '#wechatCurrentReady',
-    readyMessage: '위챗에서 백업할 방을 선택하고 위챗 창을 앞에 둔 뒤 이 브라우저로 돌아와 방 선택 완료, 앱 창 앞에 둠 표시를 하고 백업을 누르세요.',
-    openAction: 'open_wechat',
-    openLabel: '위챗 열기',
-  }));
-  view.querySelector('[data-batch-starter-wechat]')?.addEventListener('click', () => batchStarterAction({
-    missing: wechatBatchMissing,
-    sectionSelector: '#wechat',
-    readySelector: '#wechatBatchReady',
-    platformLabel: '위챗',
-    openAction: 'open_wechat',
-    openLabel: '위챗 열기',
-  }));
-  view.querySelector('[data-batch-starter-kakao]')?.addEventListener('click', () => batchStarterAction({
-    missing: kakaoBatchMissing,
-    sectionSelector: '#kakao',
-    readySelector: '#kakaoBatchReady',
-    platformLabel: '카카오톡',
-    openAction: 'open_kakaotalk',
-    openLabel: '카카오톡 열기',
-  }));
-  view.querySelector('[data-quick-chats]')?.addEventListener('click', () => navigate('/chats'));
-  view.querySelector('[data-quick-ready]')?.addEventListener('click', () => navigate('/doctor'));
   view.querySelector('#installWslTools')?.addEventListener('click', () => startBackupJob('setup', 'wsl_tools', {}, '고급 기능 도구 준비'));
   view.querySelector('#openLanguageSettings')?.addEventListener('click', () => startBackupJob('setup', 'open_language_settings', {}, 'Windows 언어 설정 열기'));
   view.querySelector('#openKakaoApp').addEventListener('click', () => startBackupJob('setup', 'open_kakaotalk', {}, '카카오톡 열기'));
-  view.querySelector('#installKakaoApp').addEventListener('click', () => startBackupJob('setup', 'open_kakaotalk_download', {}, '카카오톡 공식 설치 페이지 열기'));
+  view.querySelector('#installKakaoApp')?.addEventListener('click', () => startBackupJob('setup', 'open_kakaotalk_download', {}, '카카오톡 공식 설치 페이지 열기'));
   view.querySelector('#openWechatApp').addEventListener('click', () => startBackupJob('setup', 'open_wechat', {}, '위챗 열기'));
-  view.querySelector('#installWechatApp').addEventListener('click', () => startBackupJob('setup', 'open_wechat_download', {}, '위챗 공식 설치 페이지 열기'));
+  view.querySelector('#installWechatApp')?.addEventListener('click', () => startBackupJob('setup', 'open_wechat_download', {}, '위챗 공식 설치 페이지 열기'));
   clearFieldErrorOnInput('#kakaoPattern', '#kakaoPatternError');
   clearFieldErrorOnInput('#kakaoOpenchatTitle', '#kakaoOpenchatTitleError');
   clearCheckErrorOnChange('#kakaoOpenReady', '#kakaoOpenReadyError');
@@ -2737,7 +2201,7 @@ async function backupView() {
     if (!requireBatchReady('#kakaoBatchReady', '#kakaoBatchReadyError', '카카오톡')) return;
     if (kakaoBatchPreviewSignature !== kakaoBatchSignature()) {
       const log = view.querySelector('#backupLog');
-      if (log) log.textContent = '먼저 전체 목록 확인을 눌러 번호가 붙은 후보 목록을 확인하세요. 후보가 맞으면 목록 백업 실행을 누릅니다.\n';
+      if (log) log.textContent = '먼저 전체 목록 확인을 눌러 번호가 붙은 후보 목록을 확인하세요. 후보가 맞으면 확인한 목록 백업을 누릅니다.\n';
       setBackupNextActions('need-preview', {
         module: 'kakao',
         action: 'visible_batch',
@@ -2749,7 +2213,7 @@ async function backupView() {
       return;
     }
     const params = kakaoBatchParams(false);
-    startBackupJob('kakao', 'visible_batch', params, '카카오톡 목록 백업 실행');
+    startBackupJob('kakao', 'visible_batch', params, '카카오톡 확인한 목록 백업');
   });
   view.querySelector('#kakaoVisible').addEventListener('click', () => {
     if (!requireTextInput('#kakaoPattern', '목록에서 찾을 방 이름을 입력하세요.', '#kakaoPatternError')) return;
@@ -2797,7 +2261,7 @@ async function backupView() {
     if (!requireBatchReady('#wechatBatchReady', '#wechatBatchReadyError', '위챗')) return;
     if (wechatBatchPreviewSignature !== wechatBatchSignature()) {
       const log = view.querySelector('#backupLog');
-      if (log) log.textContent = '먼저 전체 목록 확인을 눌러 번호가 붙은 후보 목록을 확인하세요. 후보가 맞으면 목록 백업 실행을 누릅니다.\n';
+      if (log) log.textContent = '먼저 전체 목록 확인을 눌러 번호가 붙은 후보 목록을 확인하세요. 후보가 맞으면 확인한 목록 백업을 누릅니다.\n';
       setBackupNextActions('need-preview', {
         module: 'wechat',
         action: 'visible_batch',
@@ -2809,28 +2273,18 @@ async function backupView() {
       return;
     }
     const params = wechatBatchParams(false);
-    startBackupJob('wechat', 'visible_batch', params, '위챗 목록 백업 실행');
+    startBackupJob('wechat', 'visible_batch', params, '위챗 확인한 목록 백업');
   });
   view.querySelector('#wechatValidate').addEventListener('click', () => startBackupJob('wechat', 'validate_db', {}, '예전 위챗 백업 파일 검사'));
   if (fullBackupTarget) {
     requestAnimationFrame(() => {
-      const guide = view.querySelector('.full-backup-guide');
-      guide?.scrollIntoView({ behavior: 'auto', block: 'start' });
       const readySelector = fullBackupTarget === 'kakao' ? '#kakaoBatchReady' : '#wechatBatchReady';
       const input = view.querySelector(readySelector);
-      const log = view.querySelector('#backupLog');
-      if (log) {
-        log.textContent = `${fullBackupTarget === 'kakao' ? '카카오톡' : '위챗'} 통째 백업은 ${fullBackupTargetActionText}\n`;
-      }
-      setTimeout(() => {
-        const line = input?.closest('.confirm-line');
-        input?.focus();
-        line?.classList.add('attention');
-        if (line) setTimeout(() => line.classList.remove('attention'), 2200);
-      }, 250);
+      const line = input?.closest('.confirm-line');
+      input?.focus({ preventScroll: true });
+      line?.classList.add('attention');
+      if (line) setTimeout(() => line.classList.remove('attention'), 2200);
     });
-  } else if (!['wechat', 'kakao'].includes(backupTarget)) {
-    scrollToHashTarget();
   }
 }
 

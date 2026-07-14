@@ -19,7 +19,7 @@
       <nav class="nav">
         <div class="nav-group-label">자주 쓰는 메뉴</div>
         <a href="/" data-route="/" data-nav-key="home">시작</a>
-        <a href="/backup#wechat" data-route="/backup" data-nav-key="backup-wechat" class="nav-wechat"><span class="nav-full">위챗 백업</span><span class="nav-compact">위챗</span></a>
+        <a href="/backup#wechat" data-route="/backup" data-nav-key="backup-wechat"><span class="nav-full">위챗 백업</span><span class="nav-compact">위챗</span></a>
         <a href="/backup#kakao" data-route="/backup" data-nav-key="backup-kakao"><span class="nav-full">카카오톡 백업</span><span class="nav-compact">카톡</span></a>
         <a href="/chats" data-route="/chats" data-nav-key="chats"><span class="nav-full">결과 보기</span><span class="nav-compact">결과</span></a>
         <a href="/doctor" data-route="/doctor" data-nav-key="doctor">준비 확인</a>
@@ -49,16 +49,9 @@
             <div>
               <span class="guide-kicker">처음 화면</span>
               <strong>백업할 앱을 선택하세요</strong>
-              <p>위챗, 카카오톡, 결과 보기 중 필요한 작업만 누르면 됩니다.</p>
+              <p>원하는 작업 하나를 누르면 바로 이동합니다.</p>
             </div>
-            <div class="start-heading-side">
-              <span class="badge status-ready">내 컴퓨터 전용</span>
-              <div class="loading-actions" aria-label="바로 시작">
-                <a class="loading-action primary" href="/backup#wechat">위챗 백업</a>
-                <a class="loading-action" href="/backup#kakao">카카오톡 백업</a>
-                <a class="loading-action" href="/chats">결과 보기</a>
-              </div>
-            </div>
+            <span class="badge status-ready">내 컴퓨터 전용</span>
           </div>
           <div class="choice-strip" aria-label="백업 선택">
             <a class="choice-action loading-choice primary-choice" href="/backup#wechat">
@@ -79,56 +72,21 @@
           </div>
           <div class="full-backup-strip" aria-label="여러 방 통째 백업">
             <div>
-              <strong>여러 방을 한 번에 저장</strong>
-              <span>통째 백업은 전체 목록 확인으로 후보 방을 먼저 본 뒤 실행합니다.</span>
+              <strong>모든 방 백업</strong>
+              <span>목록을 먼저 확인한 뒤 한 번에 저장합니다.</span>
             </div>
             <div class="full-backup-strip-actions">
-              <a class="loading-action primary" href="/backup#wechat-full">위챗 통째 백업 확인</a>
-              <a class="loading-action" href="/backup#kakao-full">카카오톡 통째 백업 확인</a>
-            </div>
-            <ol class="full-backup-mini-steps" aria-label="통째 백업 순서">
-              <li><span>1</span><strong>전체 목록 확인</strong></li>
-              <li><span>2</span><strong>후보 확인</strong></li>
-              <li><span>3</span><strong>목록 백업 실행</strong></li>
-              <li><span>4</span><strong>결과 보기와 전체 저장</strong></li>
-            </ol>
-          </div>
-          <div class="privacy-strip privacy-strip-compact" aria-label="기본 사용 기준">
-            <div>
-              <strong>내 컴퓨터에 저장</strong>
-              <span>기본 백업은 이 컴퓨터에 저장됩니다.</span>
-            </div>
-            <div>
-              <strong>외부 전송 기본 꺼짐</strong>
-              <span>추가 검수/번역 기능은 선택할 때만 씁니다.</span>
-            </div>
-            <div>
-              <strong>입력할 내용 없음</strong>
-              <span>아무 값도 입력하지 않고 같은 화면 안에서 이어집니다.</span>
-            </div>
-          </div>
-          <div class="next-action-panel status-ready" aria-label="지금 할 일">
-            <div>
-              <strong>지금 할 일</strong>
-              <p>앱에서 백업할 방을 선택한 뒤 위의 백업 버튼을 누릅니다.</p>
-            </div>
-            <div class="next-action-buttons">
-              <a class="loading-action primary" href="/backup#wechat">위챗 백업</a>
-              <a class="loading-action" href="/backup#kakao">카카오톡 백업</a>
-              <a class="loading-action" href="/chats">결과 보기</a>
+              <a class="loading-action primary" href="/backup#wechat-full">위챗 통째 백업</a>
+              <a class="loading-action" href="/backup#kakao-full">카카오톡 통째 백업</a>
             </div>
           </div>
           <details class="home-detail-drawer">
             <summary>
               <span>
-                <strong>막힐 때만 자세히 보기</strong>
-                <small>앱 열기, 문자 인식, 저장 폴더 확인은 화면이 준비된 뒤 버튼으로 이어집니다.</small>
+                <strong>준비가 안 될 때</strong>
+                <small>화면이 준비되면 앱 실행과 문자 인식 상태를 확인할 수 있습니다.</small>
               </span>
             </summary>
-            <div class="loading-help">
-              <p>통째 백업은 앱 왼쪽 목록이 보이는 상태에서 전체 목록 확인을 누른 뒤 목록 백업 실행으로 이어집니다.</p>
-              <p>앱 실행이나 문자 인식이 막히면 화면이 준비된 뒤 보이는 버튼을 누릅니다. 따로 입력할 내용은 없습니다.</p>
-            </div>
           </details>
         </section>
       </section>

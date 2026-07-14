@@ -5,9 +5,11 @@
 param(
   [int]$Port = 0,
   [switch]$NoBrowser,
-  [switch]$StrictToken
+  [switch]$StrictToken,
+  [switch]$KeepOtherServers
 )
 $ErrorActionPreference = 'Stop'
+$keepOtherServersRequested = [bool]$KeepOtherServers -or $env:CU_KEEP_OTHER_CONSOLE_SERVERS -eq '1'
 
 . (Join-Path $PSScriptRoot 'lib\path_config.ps1')
 $cuConfig = Get-ComputerUseConfig
@@ -389,7 +391,9 @@ winget install OpenJS.NodeJS.LTS
 function Open-Console {
   Write-ConsoleAddressFiles
   Write-ConsoleTroubleshootingFile "$baseUrl/"
-  Stop-OtherComputerUseServers
+  if (-not $keepOtherServersRequested) {
+    Stop-OtherComputerUseServers
+  }
   if ($NoBrowser) { return }
   Start-Process "$baseUrl/" | Out-Null
 }

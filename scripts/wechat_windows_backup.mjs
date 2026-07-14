@@ -69,8 +69,12 @@ function updateManifestQuality(manifestPath, messagesPath, frameCount) {
   const nonText = Array.isArray(stats.non_text_message_ids) ? stats.non_text_message_ids.length : 0;
   const maxFrames = Number(manifest.capture?.max_frames || 0);
   const hitMax = maxFrames > 0 && frameCount >= maxFrames;
+  const topReached = typeof manifest.capture?.top_reached === 'boolean' ? manifest.capture.top_reached : null;
+  const bottomReached = typeof manifest.capture?.bottom_reached === 'boolean' ? manifest.capture.bottom_reached : null;
   const notes = [
     hitMax ? 'capture stopped at max_frames; full history is not proven' : '',
+    topReached === false && !hitMax ? 'capture ended without proving the oldest message was reached' : '',
+    manifest.capture?.to_bottom && bottomReached === false ? 'capture did not prove the newest message was reached before scrolling upward' : '',
     unknown > 0 ? 'some messages have unknown speaker; verify against screenshots' : '',
     low > 0 ? 'some text messages have low OCR confidence; verify text manually' : '',
     nonText > 0 ? 'some entries are attachment/media cards; verify original WeChat files or media' : '',
@@ -78,6 +82,8 @@ function updateManifestQuality(manifestPath, messagesPath, frameCount) {
   manifest.quality = {
     status: notes.length ? 'review' : 'pass',
     stopped_at_max_frames: hitMax,
+    top_reached: topReached,
+    bottom_reached: bottomReached,
     unknown_speaker_messages: unknown,
     low_confidence_text_messages: low,
     non_text_messages: nonText,
@@ -139,7 +145,13 @@ async function main() {
   process.stderr.write(capture.stderr || '');
   process.stdout.write(capture.stdout || '');
   if (!capture.ok) throw new Error(`WeChat capture failed: ${capture.stderr || capture.stdout}`);
-  const dirWin = (capture.stdout + capture.stderr).match(/DIR=(.+)$/m)?.[1]?.trim() || outDirWin;
+  const captureText = capture.stdout + capture.stderr;
+  const dirWin = captureText.match(/DIR=(.+)$/m)?.[1]?.trim() || outDirWin;
+  const topMatch = captureText.match(/\bTOP_REACHED=(True|False)\b/iu);
+  const bottomMatch = captureText.match(/\bBOTTOM_REACHED=(True|False)\b/iu);
+  const captureTopReached = topMatch ? topMatch[1].toLowerCase() === 'true' : null;
+  const captureBottomReached = bottomMatch ? bottomMatch[1].toLowerCase() === 'true' : null;
+  const captureStopReason = captureText.match(/\bSTOP_REASON=([^\s]+)/u)?.[1] || null;
   const dir = windowsPathToLocal(dirWin);
   const frames = readdirSync(dir).filter((file) => /^frame_\d+\.png$/u.test(file)).sort();
   if (!frames.length) throw new Error(`no frame_*.png captured in ${dir}`);
@@ -194,6 +206,9 @@ async function main() {
       input_guard_px: 0,
       input_recrop_count: 0,
       to_bottom: Boolean(args['to-bottom']),
+      stop_reason: captureStopReason,
+      top_reached: captureTopReached,
+      bottom_reached: captureBottomReached,
     },
     ocr: {
       engine: 'windows_ocr',

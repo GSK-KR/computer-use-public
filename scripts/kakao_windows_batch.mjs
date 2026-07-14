@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadPathConfig } from './lib/path_config.mjs';
 import { parseArgs, readJson, run, sanitizeFileName, timestamp, writeJson } from './lib/cu_common.mjs';
+import { VisibleListTracker } from './lib/visible_list_tracker.mjs';
 
 const args = parseArgs();
 const repo = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
@@ -22,17 +23,18 @@ Options:
   --proc NAME              KakaoTalk process name (default: KakaoTalk)
   --hwnd N                 exact KakaoTalk main window handle
   --main-title TITLE       main window title hint (default: 카카오톡)
-  --pages N                max visible-list pages to scan (default: 1, --all-visible default: 80)
-  --room-limit N           max rooms to back up (default: 5, --all-visible default: 200)
+  --pages N                max visible-list pages to scan (default: 1, --all-visible default: 500)
+  --room-limit N           max rooms to back up (default: 5, --all-visible default: 2000)
   --max-visible-rooms N    max candidates per page (default: 30)
-  --max-frames N           frames per room backup (default: 120)
+  --max-frames N           frames per room backup (default: 500)
   --room-retries N         retry failed room open/backup attempts (default: 1)
   --list-crop auto|WxH+X+Y left list region in window pixels (default: auto)
   --ocr-lang LANG          Windows OCR language hint (default: ko)
   --out-dir DIR            output directory (default: shots\\kakao_batch_windows_*)
   --all-visible            keep scrolling the left list until no new rooms appear
   --stop-after-duplicate-pages N
-                           stop --all-visible after N pages with no new room (default: 2)
+                           stop --all-visible after N pages with no new room (default: 4)
+  --skip-special-folders   do not enter special list folders (internal nested-list guard)
   --dry-run                only show detected list candidates; do not click rooms`);
 }
 
@@ -230,8 +232,9 @@ function scrollList(notches, size, listRegion) {
 function resetListToTop(size, listRegion) {
   if (!allVisible || boolArg('no-reset-to-top')) return;
   console.log('  목록 시작 위치를 위쪽으로 맞춥니다...');
+  const resetNotches = Math.max(2000, roomLimit * 2);
   for (let i = 0; i < resetScrolls; i++) {
-    scrollList(8, size, listRegion);
+    scrollList(resetNotches, size, listRegion);
     sleepMs(120);
   }
   sleepMs(pageWaitMs);
@@ -309,18 +312,20 @@ const proc = textArg('proc', 'KakaoTalk');
 const hwnd = textArg('hwnd');
 const mainTitle = textArg('main-title', '카카오톡');
 const allVisible = boolArg('all-visible') || boolArg('full-list') || boolArg('scan-all');
-const pages = intArg('pages', allVisible ? 80 : 1, 1, 200);
-const roomLimit = intArg('room-limit', allVisible ? 200 : 5, 1, 500);
+const pages = intArg('pages', allVisible ? 500 : 1, 1, 500);
+const roomLimit = intArg('room-limit', allVisible ? 2000 : 5, 1, 2000);
 const maxVisibleRooms = intArg('max-visible-rooms', 30, 1, 200);
-const maxFrames = intArg('max-frames', 120, 1, 500);
+const maxFrames = intArg('max-frames', 500, 1, 500);
 const roomRetries = intArg('room-retries', 1, 0, 5);
 const roomWaitMs = intArg('room-wait-ms', 1200, 100, 10000);
 const pageWaitMs = intArg('page-wait-ms', 700, 100, 10000);
-const resetScrolls = intArg('reset-scrolls', allVisible ? 10 : 0, 0, 40);
-const stopAfterDuplicatePages = intArg('stop-after-duplicate-pages', allVisible ? 2 : 200, 1, 20);
+const resetScrolls = intArg('reset-scrolls', allVisible ? 3 : 0, 0, 40);
+const stopAfterDuplicatePages = intArg('stop-after-duplicate-pages', allVisible ? 4 : 20, 1, 20);
 const listCropArg = textArg('list-crop', 'auto');
 const ocrLang = textArg('ocr-lang', 'ko');
 const dryRun = boolArg('dry-run');
+const nestedList = boolArg('nested-list');
+const skipSpecialFolders = boolArg('skip-special-folders');
 const toBottom = !boolArg('no-to-bottom') && args['to-bottom'] !== 'false';
 const outDirWin = textArg('out-dir') || join(pathConfig.shotsDirWin, `kakao_batch_windows_${timestamp()}`);
 const outDir = windowsPathToLocal(outDirWin);
@@ -352,14 +357,20 @@ const manifest = {
     all_visible: allVisible,
     stop_after_duplicate_pages: stopAfterDuplicatePages,
     dry_run: dryRun,
+    nested_list: nestedList,
+    skip_special_folders: skipSpecialFolders,
     to_bottom: toBottom,
   },
   pages: [],
+  folders: [],
   rooms: [],
   list_complete: false,
   stats: {
     detected_candidates: 0,
     unique_candidates: 0,
+    top_level_unique_candidates: 0,
+    special_folders: 0,
+    folder_count_mismatches: 0,
     processed_rooms: 0,
     opened_rooms: 0,
     open_failed: 0,
@@ -382,12 +393,184 @@ const manifest = {
 };
 writeManifest(manifestPath, manifest);
 
-const seenLabels = new Set();
-const seenTitles = new Set();
-const seenCandidateLabels = new Set();
+const candidateTracker = new VisibleListTracker();
 let processed = 0;
 let duplicatePages = 0;
 let stopReason = null;
+let estimatedCandidateRooms = 0;
+let specialFoldersComplete = true;
+
+function refreshRoomStats() {
+  manifest.stats.processed_rooms = processed;
+  manifest.stats.pass = manifest.rooms.filter((item) => String(item.audit_status || '').toLowerCase() === 'pass').length;
+  manifest.stats.review = manifest.rooms.filter((item) => String(item.audit_status || '').toLowerCase() === 'review').length;
+  manifest.stats.fail_or_missing = manifest.rooms.filter((item) => !['pass', 'review', 'skipped_duplicate_title'].includes(String(item.audit_status || '').toLowerCase())).length;
+}
+
+function candidateRoomWeight(room) {
+  if (room?.kind !== 'quiet_folder') return 1;
+  const count = Number(room.folder_room_count);
+  return Number.isInteger(count) && count > 0 ? count : 1;
+}
+
+function closeWindowOpenedByUs(opened) {
+  if (!String(opened?.method || '').startsWith('new_') || !opened?.window?.hwnd) return;
+  psKakao('key', ['-Hwnd', String(opened.window.hwnd), '-Keys', '%{F4}'], { allowFail: true });
+  sleepMs(180);
+}
+
+function scanSpecialFolder(room, page) {
+  const listLabel = String(room.label || '조용한 채팅방').trim();
+  const clickX = Number(room.click_x || 0);
+  const clickY = Number(room.click_y || 0);
+  const absX = Math.round((mainRect?.left || 0) + clickX);
+  const absY = Math.round((mainRect?.top || 0) + clickY);
+  const expectedRooms = candidateRoomWeight(room);
+  const folderDir = join(outDir, `folder_${sanitizeFileName(listLabel)}`);
+  const folderManifestPath = join(folderDir, 'kakao_batch_manifest.json');
+  const folderRecord = {
+    page,
+    label: listLabel,
+    kind: room.kind,
+    expected_rooms: expectedRooms,
+    click: { x: clickX, y: clickY, screen_x: absX, screen_y: absY },
+    status: 'opening',
+    list_complete: false,
+    output_dir: localPathToWindows(folderDir),
+  };
+  manifest.folders.push(folderRecord);
+  manifest.stats.special_folders = manifest.folders.length;
+  writeManifest(manifestPath, manifest);
+
+  if (skipSpecialFolders) {
+    folderRecord.status = 'skipped';
+    folderRecord.reason = 'nested special-folder scan guard';
+    specialFoldersComplete = false;
+    console.log(`  특수 목록은 중첩 실행 보호를 위해 건너뜁니다: ${listLabel}`);
+    return;
+  }
+
+  console.log(`\n[특수 목록] ${listLabel}${expectedRooms > 1 ? ` (${expectedRooms}개 방)` : ''}을 확인합니다...`);
+  let opened = { window: null, method: 'not_found' };
+  for (let attempt = 1; attempt <= roomRetries + 1; attempt++) {
+    const beforeWindows = listKakaoWindows();
+    psKakao('doubleclick', ['-Hwnd', mainHwnd, '-X', String(absX), '-Y', String(absY)]);
+    sleepMs(roomWaitMs);
+    opened = resolveOpenedChatWindow(beforeWindows, listKakaoWindows(), listLabel);
+    if (opened.window?.hwnd) break;
+    if (attempt <= roomRetries) console.log(`  특수 목록 열기를 다시 시도합니다 (${attempt + 1}/${roomRetries + 1})...`);
+  }
+
+  if (!opened.window?.hwnd) {
+    folderRecord.status = 'open_failed';
+    folderRecord.reason = 'special KakaoTalk list window was not found';
+    specialFoldersComplete = false;
+    if (!dryRun) {
+      processed += 1;
+      manifest.stats.open_failed += 1;
+      manifest.rooms.push({
+        page,
+        index: processed,
+        kind: room.kind,
+        label: listLabel,
+        click: folderRecord.click,
+        scrape_status: 'failed',
+        audit_status: 'folder_open_failed',
+        skip_reason: 'special KakaoTalk list window was not found',
+        room_dir: localPathToWindows(folderDir),
+      });
+      refreshRoomStats();
+    }
+    writeManifest(manifestPath, manifest);
+    console.error(`  ${listLabel} 목록 창을 열지 못했습니다.`);
+    return;
+  }
+
+  folderRecord.hwnd = opened.window.hwnd;
+  folderRecord.open_method = opened.method;
+  const remainingRooms = Math.max(1, roomLimit - processed);
+  const childArgs = [
+    join(repo, 'scripts', 'kakao_windows_batch.mjs'),
+    '--confirm-local-backup',
+    '--hwnd',
+    String(opened.window.hwnd),
+    '--main-title',
+    listLabel,
+    '--all-visible',
+    '--nested-list',
+    '--skip-special-folders',
+    '--pages',
+    String(pages),
+    '--room-limit',
+    String(remainingRooms),
+    '--max-visible-rooms',
+    String(maxVisibleRooms),
+    '--max-frames',
+    String(maxFrames),
+    '--room-retries',
+    String(roomRetries),
+    '--room-wait-ms',
+    String(roomWaitMs),
+    '--page-wait-ms',
+    String(pageWaitMs),
+    '--reset-scrolls',
+    String(resetScrolls),
+    '--stop-after-duplicate-pages',
+    String(stopAfterDuplicatePages),
+    '--list-crop',
+    'auto',
+    '--ocr-lang',
+    ocrLang,
+    '--out-dir',
+    localPathToWindows(folderDir),
+  ];
+  if (dryRun) childArgs.push('--dry-run');
+  if (toBottom) childArgs.push('--to-bottom');
+  else childArgs.push('--no-to-bottom');
+
+  const child = run(process.execPath, childArgs, { cwd: repo, stdio: 'inherit' });
+  const childManifest = readJson(folderManifestPath, {});
+  const childStats = childManifest.stats || {};
+  const childRooms = Array.isArray(childManifest.rooms) ? childManifest.rooms : [];
+  const discoveredRooms = Number(childStats.unique_candidates || 0);
+  if (discoveredRooms > 0 && (childManifest.list_complete || expectedRooms === 1)) {
+    estimatedCandidateRooms += discoveredRooms - expectedRooms;
+    manifest.stats.unique_candidates = estimatedCandidateRooms;
+  }
+
+  if (!dryRun) {
+    const offset = processed;
+    childRooms.forEach((item, index) => manifest.rooms.push({
+      ...item,
+      parent_page: page,
+      folder_label: listLabel,
+      index: offset + index + 1,
+    }));
+    processed += Math.max(Number(childStats.processed_rooms || 0), childRooms.length);
+    manifest.stats.opened_rooms += Number(childStats.opened_rooms || 0);
+    manifest.stats.open_failed += Number(childStats.open_failed || 0);
+    manifest.stats.retried_rooms += Number(childStats.retried_rooms || 0);
+    manifest.stats.retry_attempts += Number(childStats.retry_attempts || 0);
+    refreshRoomStats();
+  }
+
+  folderRecord.manifest = localPathToWindows(folderManifestPath);
+  folderRecord.detected_rooms = discoveredRooms;
+  folderRecord.count_difference = discoveredRooms - expectedRooms;
+  folderRecord.count_matches_expected = discoveredRooms === expectedRooms;
+  manifest.stats.folder_count_mismatches = manifest.folders.filter((item) => item.count_matches_expected === false).length;
+  folderRecord.processed_rooms = Number(childStats.processed_rooms || 0);
+  folderRecord.list_complete = Boolean(childManifest.list_complete);
+  folderRecord.status = child.ok && folderRecord.list_complete ? 'complete' : (child.ok ? 'incomplete' : 'failed');
+  folderRecord.stop_reason = childManifest.stop_reason || (child.ok ? null : 'special-list child process failed');
+  if (!folderRecord.list_complete || !child.ok) specialFoldersComplete = false;
+  closeWindowOpenedByUs(opened);
+  writeManifest(manifestPath, manifest);
+  console.log(`  ${listLabel} 확인 결과: ${folderRecord.list_complete ? '목록 끝까지 확인' : '추가 확인 필요'}, 후보 ${discoveredRooms}개.`);
+  if (discoveredRooms !== expectedRooms) {
+    console.log(`  표시된 방 수 ${expectedRooms}개와 발견한 후보 ${discoveredRooms}개가 다릅니다. 결과에서 빠진 방이나 잘못 읽은 행이 없는지 확인하세요.`);
+  }
+}
 
 console.log(dryRun ? '카카오톡 목록 확인을 시작합니다.' : '카카오톡 목록 백업을 시작합니다.');
 console.log(`  대상: ${proc}${hwnd ? ` hwnd=${hwnd}` : ''}`);
@@ -395,7 +578,7 @@ console.log(`  저장 위치: ${outDirWin}`);
 console.log(`  범위: ${allVisible ? '왼쪽 목록 끝까지 자동 순회' : '현재 보이는 목록 기준'}`);
 console.log(`  페이지 상한: ${pages}, 방 개수 상한: ${roomLimit}, 방별 캡처 수: ${maxFrames}`);
 console.log(`  방 실패 재시도: ${roomRetries}회`);
-if (dryRun) console.log('  목록 확인: 방을 클릭하지 않고 후보만 표시합니다.');
+if (dryRun) console.log('  목록 확인: 개별 채팅방은 열지 않고 후보만 표시합니다.');
 
 let resetDone = false;
 for (let page = 1; page <= pages; page++) {
@@ -428,17 +611,13 @@ for (let page = 1; page <= pages; page++) {
   ]);
   writeJson(candidatesJson, candidates);
   const rooms = Array.isArray(candidates.rooms) ? candidates.rooms : [];
-  const uniqueStart = seenCandidateLabels.size;
-  const newRooms = [];
-  for (const room of rooms) {
-    const key = normalizedKey(room?.label || '');
-    if (!key || seenCandidateLabels.has(key)) continue;
-    seenCandidateLabels.add(key);
-    newRooms.push(room);
-  }
-  const candidateStart = allVisible ? uniqueStart : manifest.stats.detected_candidates;
+  const trackedPage = candidateTracker.addPage(rooms);
+  const newRooms = trackedPage.newRooms;
+  const candidateStart = trackedPage.total - newRooms.length;
+  estimatedCandidateRooms += newRooms.reduce((sum, room) => sum + candidateRoomWeight(room), 0);
   manifest.stats.detected_candidates += rooms.length;
-  manifest.stats.unique_candidates = seenCandidateLabels.size;
+  manifest.stats.top_level_unique_candidates = trackedPage.total;
+  manifest.stats.unique_candidates = estimatedCandidateRooms;
   if (allVisible) {
     duplicatePages = newRooms.length ? 0 : duplicatePages + 1;
   }
@@ -450,33 +629,41 @@ for (let page = 1; page <= pages; page++) {
     list_crop: listRegion.spec,
     candidates: rooms.length,
     new_candidates: newRooms.length,
+    overlap_candidates: trackedPage.overlap,
     duplicate_page_count: duplicatePages,
   });
   writeManifest(manifestPath, manifest);
   console.log(`  후보 ${rooms.length}개를 찾았습니다. 새 후보 ${newRooms.length}개, 누적 후보 ${manifest.stats.unique_candidates}개. crop=${listRegion.spec}`);
 
   if (dryRun) {
+    if (allVisible) {
+      for (const room of newRooms.filter((item) => item?.kind === 'quiet_folder')) {
+        scanSpecialFolder(room, page);
+      }
+    }
     if (!rooms.length) {
       console.log('  후보를 찾지 못했습니다. 카카오톡 왼쪽 채팅 목록이 보이게 한 뒤 다시 목록 확인을 누르세요.');
     } else {
       console.log('  후보 목록:');
-      const shownRooms = allVisible ? newRooms : rooms;
+      const shownRooms = newRooms;
       shownRooms.forEach((room, index) => {
-        console.log(`  ${String(candidateStart + index + 1).padStart(2, ' ')}. ${room.label || '(제목 없음)'}`);
+        const folderCount = room?.kind === 'quiet_folder' && Number(room.folder_room_count) > 0
+          ? ` (${room.folder_room_count}개 방 보관함)`
+          : '';
+        console.log(`  ${String(candidateStart + index + 1).padStart(2, ' ')}. ${room.label || '(제목 없음)'}${folderCount}`);
       });
       if (allVisible && !shownRooms.length) console.log('  새 후보가 없습니다. 목록 끝에 가까워졌는지 확인합니다.');
       console.log('  후보가 맞으면 웹 화면에서 목록 백업을 누르세요.');
     }
   } else {
-    for (const room of rooms) {
+    for (const room of newRooms) {
       if (processed >= roomLimit) break;
-      const listLabel = String(room.label || '').trim();
-      const labelKey = normalizedKey(listLabel);
-      if (!labelKey || seenLabels.has(labelKey)) {
-        manifest.stats.skipped_duplicate_labels += 1;
+      if (room?.kind === 'quiet_folder') {
+        if (allVisible) scanSpecialFolder(room, page);
+        else console.log(`  ${room.label || '특수 목록'}은 전체 목록 백업에서 함께 처리합니다.`);
         continue;
       }
-      seenLabels.add(labelKey);
+      const listLabel = String(room.label || '').trim();
 
       processed += 1;
       const index = String(processed).padStart(3, '0');
@@ -490,10 +677,7 @@ for (let page = 1; page <= pages; page++) {
       for (let attempt = 1; attempt <= roomRetries + 1; attempt++) {
         if (attempt > 1) console.log(`  방 열기를 다시 시도합니다 (${attempt}/${roomRetries + 1}): ${listLabel || '(제목 없음)'}`);
         const beforeWindows = listKakaoWindows();
-        for (let i = 0; i < 2; i++) {
-          psKakao('click', ['-Hwnd', mainHwnd, '-X', String(absX), '-Y', String(absY)]);
-          sleepMs(160);
-        }
+        psKakao('doubleclick', ['-Hwnd', mainHwnd, '-X', String(absX), '-Y', String(absY)]);
         sleepMs(roomWaitMs);
         const afterWindows = listKakaoWindows();
         opened = resolveOpenedChatWindow(beforeWindows, afterWindows, listLabel);
@@ -527,30 +711,6 @@ for (let page = 1; page <= pages; page++) {
 
       manifest.stats.opened_rooms += 1;
       const titleLabel = String(opened.window.title || listLabel || 'KakaoTalk chat').trim();
-      const titleKey = normalizedKey(titleLabel);
-      if (titleKey && seenTitles.has(titleKey)) {
-        if (roomHadRetry) manifest.stats.retried_rooms += 1;
-        manifest.stats.skipped_duplicate_titles += 1;
-        manifest.rooms.push({
-          page,
-          index: processed,
-          label: titleLabel,
-          list_label: listLabel,
-          hwnd: opened.window.hwnd,
-          open_method: opened.method,
-          click: { x: clickX, y: clickY, screen_x: absX, screen_y: absY },
-          open_attempts: openAttempts,
-          retried: roomHadRetry,
-          scrape_status: 'skipped',
-          audit_status: 'skipped_duplicate_title',
-          skip_reason: 'selected room title was already processed',
-          room_dir: localPathToWindows(roomDir),
-        });
-        writeManifest(manifestPath, manifest);
-        console.log(`  이미 처리한 방이라 건너뜁니다: ${titleLabel}`);
-        continue;
-      }
-      if (titleKey) seenTitles.add(titleKey);
 
       const backupArgs = [
         join(repo, 'scripts', 'kakao_regular_chat.mjs'),
@@ -614,11 +774,15 @@ for (let page = 1; page <= pages; page++) {
       manifest.stats.review = manifest.rooms.filter((it) => String(it.audit_status || '').toLowerCase() === 'review').length;
       manifest.stats.fail_or_missing = manifest.rooms.filter((it) => !['pass', 'review', 'skipped_duplicate_title'].includes(String(it.audit_status || '').toLowerCase())).length;
       writeManifest(manifestPath, manifest);
+      closeWindowOpenedByUs(opened);
       console.log(`  완료: ${titleLabel || listLabel} (${auditStatus})`);
     }
   }
 
-  if (processed >= roomLimit) {
+  const roomLimitReached = dryRun
+    ? (allVisible && manifest.stats.unique_candidates >= roomLimit)
+    : processed >= roomLimit;
+  if (roomLimitReached) {
     stopReason = '방 개수 상한에 도달해 멈췄습니다. 모든 방을 확인하지 못했을 수 있습니다. 백업 화면의 상한 늘려 전체 목록 다시 확인을 눌러 후보 확인부터 다시 시작하세요.';
     break;
   }
@@ -636,8 +800,12 @@ for (let page = 1; page <= pages; page++) {
 }
 
 manifest.timings.total_elapsed_s = Math.round((Date.now() - startedAt) / 100) / 10;
+const mainListComplete = allVisible && stopReason === '새 방이 더 이상 나오지 않아 목록 순회를 멈췄습니다.';
+if (mainListComplete && !specialFoldersComplete) {
+  stopReason = '일반 목록 끝은 확인했지만 특수 목록을 끝까지 확인하지 못했습니다.';
+}
 manifest.stop_reason = stopReason;
-manifest.list_complete = allVisible && stopReason === '새 방이 더 이상 나오지 않아 목록 순회를 멈췄습니다.';
+manifest.list_complete = mainListComplete && specialFoldersComplete;
 manifest.list_end_status = manifest.list_complete ? 'complete' : (allVisible ? 'not_proven_complete' : 'visible_page_only');
 manifest.stats.attention_rooms = attentionRooms(manifest).length;
 manifest.stats.list_complete = manifest.list_complete;

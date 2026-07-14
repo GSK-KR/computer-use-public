@@ -12,6 +12,7 @@ param(
   [int]$Notches = 8,
   [int]$LoadWaitMs = 600,         # wait after each scroll for lazy-loaded history to arrive
   [int]$SettleMs = 700,          # extra wait before concluding "top reached" (re-check, avoids false stop mid-load)
+  [ValidateRange(2,10)][int]$StableChecks = 3,
   [switch]$ToBottom,
   [string]$OutDir = ''
 )
@@ -88,31 +89,54 @@ function FrameHash($p) { (Get-FileHash -Path $p -Algorithm MD5).Hash }
 
 # Phase A: scroll to bottom (newest) until stable
 if ($ToBottom) {
-  $tmp = Join-Path $OutDir '_probe.png'; $prev = ''
+  $tmp = Join-Path $OutDir '_probe.png'; $prev = ''; $bottomStable = 0
   for ($i=0; $i -lt 50; $i++) {
     [ScrapeWin]::Wheel($h, [int](-$Notches), [double]0.5, [double]0.5); Start-Sleep -Milliseconds $LoadWaitMs
     [void][ScrapeWin]::Capture($h, $tmp); $hh = FrameHash $tmp
-    if ($hh -eq $prev) { break }; $prev = $hh
+    if ($hh -eq $prev) {
+      $bottomStable++
+      if ($bottomStable -ge 2) { break }
+    } else {
+      $bottomStable = 0
+      $prev = $hh
+    }
   }
+  $bottomReached = $bottomStable -ge 2
   Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+} else {
+  $bottomReached = $false
 }
 
 # Phase B: capture, then scroll UP to load older messages; stop only when scrolling yields
 #   no new content (top reached). Lazy-load aware: a matching capture is re-checked after
 #   SettleMs before concluding "top", so a slow history load doesn't trigger a false stop.
-$count = 0; $prevHash = ''
+$count = 0; $prevHash = ''; $topReached = $false; $stopReason = 'frame_limit'
 for ($i=0; $i -lt $MaxFrames; $i++) {
   $fp = Join-Path $OutDir ("frame_{0:D3}.png" -f $count)
   [void][ScrapeWin]::Capture($h, $fp)
   $hh = FrameHash $fp
   if ($hh -eq $prevHash) {
-    Start-Sleep -Milliseconds $SettleMs                       # maybe still lazy-loading: give it a chance
-    [void][ScrapeWin]::Capture($h, $fp); $hh = FrameHash $fp
-    if ($hh -eq $prevHash) { Remove-Item $fp -Force; break }   # confirmed no change -> top
+    $stable = 1
+    for ($check=1; $check -lt $StableChecks; $check++) {
+      Start-Sleep -Milliseconds $SettleMs
+      [ScrapeWin]::Wheel($h, [int]$Notches, [double]0.5, [double]0.45)
+      Start-Sleep -Milliseconds $LoadWaitMs
+      [void][ScrapeWin]::Capture($h, $fp); $hh = FrameHash $fp
+      if ($hh -ne $prevHash) { $stable = 0; break }
+      $stable++
+    }
+    if ($stable -ge $StableChecks) {
+      Remove-Item $fp -Force
+      $topReached = $true
+      $stopReason = 'top_stable'
+      break
+    }
   }
   $prevHash = $hh; $count++
   [ScrapeWin]::Wheel($h, [int]$Notches, [double]0.5, [double]0.45)
   Start-Sleep -Milliseconds $LoadWaitMs
 }
 
-Write-Output ("FRAMES=$count DIR=$OutDir")
+Write-Output "FRAMES=$count"
+Write-Output "DIR=$OutDir"
+Write-Output "STOP_REASON=$stopReason TOP_REACHED=$topReached BOTTOM_REACHED=$bottomReached STABLE_CHECKS=$StableChecks"

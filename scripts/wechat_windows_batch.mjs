@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadPathConfig } from './lib/path_config.mjs';
 import { parseArgs, readJson, run, sanitizeFileName, timestamp, writeJson } from './lib/cu_common.mjs';
+import { VisibleListTracker } from './lib/visible_list_tracker.mjs';
 
 const args = parseArgs();
 const repo = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
@@ -21,10 +22,10 @@ function usage() {
 Options:
   --proc NAME              WeChat process name (default: Weixin)
   --hwnd N                 exact WeChat main window handle
-  --pages N                max visible-list pages to scan (default: 1, --all-visible default: 80)
-  --room-limit N           max rooms to back up (default: 5, --all-visible default: 200)
+  --pages N                max visible-list pages to scan (default: 1, --all-visible default: 500)
+  --room-limit N           max rooms to back up (default: 5, --all-visible default: 2000)
   --max-visible-rooms N    max candidates per page (default: 20)
-  --max-frames N           frames per room backup (default: 120)
+  --max-frames N           frames per room backup (default: 800)
   --room-retries N         retry failed room backup attempts (default: 1)
   --list-crop auto|WxH+X+Y left list region in window pixels (default: auto)
   --ocr-lang LANG          Windows OCR language hint (default: zh-Hans)
@@ -32,7 +33,7 @@ Options:
   --direct-chat-auto       use room title as 1:1 incoming speaker hint
   --all-visible            keep scrolling the left list until no new rooms appear
   --stop-after-duplicate-pages N
-                           stop --all-visible after N pages with no new room (default: 2)
+                           stop --all-visible after N pages with no new room (default: 4)
   --dry-run                only show detected list candidates; do not click rooms`);
 }
 
@@ -98,10 +99,6 @@ function headerRegion(width, height, listRegion) {
 function sleepMs(ms) {
   const view = new Int32Array(new SharedArrayBuffer(4));
   Atomics.wait(view, 0, 0, Math.max(0, Number(ms) || 0));
-}
-
-function normalizedKey(text) {
-  return String(text || '').replace(/[\s\p{P}\p{S}]/gu, '').toLowerCase();
 }
 
 function runChecked(label, cmd, commandArgs, options = {}) {
@@ -224,15 +221,15 @@ if (process.platform !== 'win32') throw new Error('wechat_windows_batch.mjs는 W
 const proc = textArg('proc', 'Weixin');
 const hwnd = textArg('hwnd');
 const allVisible = boolArg('all-visible') || boolArg('full-list') || boolArg('scan-all');
-const pages = intArg('pages', allVisible ? 80 : 1, 1, 200);
-const roomLimit = intArg('room-limit', allVisible ? 200 : 5, 1, 500);
+const pages = intArg('pages', allVisible ? 500 : 1, 1, 500);
+const roomLimit = intArg('room-limit', allVisible ? 2000 : 5, 1, 2000);
 const maxVisibleRooms = intArg('max-visible-rooms', 20, 1, 200);
-const maxFrames = intArg('max-frames', 120, 1, 800);
+const maxFrames = intArg('max-frames', 800, 1, 800);
 const roomRetries = intArg('room-retries', 1, 0, 5);
 const roomWaitMs = intArg('room-wait-ms', 900, 100, 10000);
 const pageWaitMs = intArg('page-wait-ms', 700, 100, 10000);
-const resetScrolls = intArg('reset-scrolls', allVisible ? 10 : 0, 0, 40);
-const stopAfterDuplicatePages = intArg('stop-after-duplicate-pages', allVisible ? 2 : 200, 1, 20);
+const resetScrolls = intArg('reset-scrolls', allVisible ? 3 : 0, 0, 40);
+const stopAfterDuplicatePages = intArg('stop-after-duplicate-pages', allVisible ? 4 : 20, 1, 20);
 const listCropArg = textArg('list-crop', 'auto');
 const ocrLang = textArg('ocr-lang', 'zh-Hans');
 const directChatAuto = boolArg('direct-chat-auto');
@@ -295,9 +292,7 @@ const manifest = {
 };
 writeManifest(manifestPath, manifest);
 
-const seenLabels = new Set();
-const seenTitles = new Set();
-const seenCandidateLabels = new Set();
+const candidateTracker = new VisibleListTracker();
 let processed = 0;
 let duplicatePages = 0;
 let stopReason = null;
@@ -308,8 +303,9 @@ function resetListToTop(size, listRegion) {
   console.log('  목록 시작 위치를 위쪽으로 맞춥니다...');
   const scrollX = Math.floor(listRegion.x + listRegion.width * 0.48);
   const scrollY = Math.floor(listRegion.y + listRegion.height * 0.52);
+  const resetNotches = Math.max(2000, roomLimit * 2);
   for (let i = 0; i < resetScrolls; i++) {
-    psWechat('scroll', ['-X', String(scrollX), '-Y', String(scrollY), '-Notches', '8']);
+    psWechat('scroll', ['-X', String(scrollX), '-Y', String(scrollY), '-Notches', String(resetNotches)]);
     sleepMs(120);
   }
   sleepMs(pageWaitMs);
@@ -353,17 +349,11 @@ for (let page = 1; page <= pages; page++) {
   ]);
   writeJson(candidatesJson, candidates);
   const rooms = Array.isArray(candidates.rooms) ? candidates.rooms : [];
-  const uniqueStart = seenCandidateLabels.size;
-  const newRooms = [];
-  for (const room of rooms) {
-    const key = normalizedKey(room?.label || '');
-    if (!key || seenCandidateLabels.has(key)) continue;
-    seenCandidateLabels.add(key);
-    newRooms.push(room);
-  }
-  const candidateStart = allVisible ? uniqueStart : manifest.stats.detected_candidates;
+  const trackedPage = candidateTracker.addPage(rooms);
+  const newRooms = trackedPage.newRooms;
+  const candidateStart = trackedPage.total - newRooms.length;
   manifest.stats.detected_candidates += rooms.length;
-  manifest.stats.unique_candidates = seenCandidateLabels.size;
+  manifest.stats.unique_candidates = trackedPage.total;
   if (allVisible) {
     duplicatePages = newRooms.length ? 0 : duplicatePages + 1;
   }
@@ -375,6 +365,7 @@ for (let page = 1; page <= pages; page++) {
     list_crop: listRegion.spec,
     candidates: rooms.length,
     new_candidates: newRooms.length,
+    overlap_candidates: trackedPage.overlap,
     duplicate_page_count: duplicatePages,
   });
   writeManifest(manifestPath, manifest);
@@ -385,7 +376,7 @@ for (let page = 1; page <= pages; page++) {
       console.log('  후보를 찾지 못했습니다. 위챗 왼쪽 채팅 목록이 보이게 한 뒤 다시 목록 확인을 누르세요.');
     } else {
       console.log('  후보 목록:');
-      const shownRooms = allVisible ? newRooms : rooms;
+      const shownRooms = newRooms;
       shownRooms.forEach((room, index) => {
         console.log(`  ${String(candidateStart + index + 1).padStart(2, ' ')}. ${room.label || '(제목 없음)'}`);
       });
@@ -393,15 +384,9 @@ for (let page = 1; page <= pages; page++) {
       console.log('  후보가 맞으면 웹 화면에서 목록 백업을 누르세요.');
     }
   } else {
-    for (const room of rooms) {
+    for (const room of newRooms) {
       if (processed >= roomLimit) break;
       const listLabel = String(room.label || '').trim();
-      const labelKey = normalizedKey(listLabel);
-      if (!labelKey || seenLabels.has(labelKey)) {
-        manifest.stats.skipped_duplicate_labels += 1;
-        continue;
-      }
-      seenLabels.add(labelKey);
 
       processed += 1;
       const index = String(processed).padStart(3, '0');
@@ -432,29 +417,7 @@ for (let page = 1; page <= pages; page++) {
         console.error(`  제목 추정은 건너뜁니다: ${err.message}`);
       }
 
-      const titleKey = normalizedKey(titleLabel);
       const roomDir = join(roomsDir, `${index}_${sanitizeFileName(titleLabel || listLabel || 'wechat_room')}`);
-      if (titleKey && seenTitles.has(titleKey)) {
-        manifest.stats.skipped_duplicate_titles += 1;
-        manifest.stats.skipped_duplicate_title += 1;
-        manifest.rooms.push({
-          page,
-          index: processed,
-          label: titleLabel,
-          list_label: listLabel,
-          click: { x: clickX, y: clickY },
-          backup_attempts: 0,
-          retried: false,
-          scrape_status: 'skipped',
-          audit_status: 'skipped_duplicate_title',
-          skip_reason: 'selected room title was already processed',
-          room_dir: localPathToWindows(roomDir),
-        });
-        writeManifest(manifestPath, manifest);
-        console.log(`  이미 처리한 방이라 건너뜁니다: ${titleLabel}`);
-        continue;
-      }
-      if (titleKey) seenTitles.add(titleKey);
 
       const backupArgs = [
         join(repo, 'scripts', 'wechat_windows_backup.mjs'),
@@ -470,6 +433,7 @@ for (let page = 1; page <= pages; page++) {
       ];
       if (hwnd) backupArgs.push('--hwnd', hwnd);
       if (directChatAuto) backupArgs.push('--incoming-speaker', 'auto');
+      backupArgs.push('--to-bottom');
 
       let scrapeStatus = 'ok';
       let auditStatus = 'missing';
@@ -529,7 +493,10 @@ for (let page = 1; page <= pages; page++) {
     }
   }
 
-  if (processed >= roomLimit) {
+  const roomLimitReached = dryRun
+    ? (allVisible && manifest.stats.unique_candidates >= roomLimit)
+    : processed >= roomLimit;
+  if (roomLimitReached) {
     stopReason = '방 개수 상한에 도달해 멈췄습니다. 모든 방을 확인하지 못했을 수 있습니다. 백업 화면의 상한 늘려 전체 목록 다시 확인을 눌러 후보 확인부터 다시 시작하세요.';
     break;
   }

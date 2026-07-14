@@ -2460,6 +2460,16 @@ textarea {
     min-width: 0;
     max-width: 100%;
   }
+  .grid,
+  .panel {
+    width: 100%;
+  }
+  .compact-backup-head > *,
+  .workflow-panel > *,
+  .backup-switcher {
+    min-width: 0;
+    max-width: 100%;
+  }
   .topbar,
   .view {
     overflow-x: hidden;
@@ -2589,6 +2599,7 @@ textarea {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
+    overflow: hidden;
   }
   .backup-switcher > button {
     width: 100%;

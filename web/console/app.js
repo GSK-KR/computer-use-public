@@ -1374,8 +1374,8 @@ function setBackupNextActions(mode, retryJob = null, options = {}) {
         status: 'review',
         title: '전체 목록을 더 확인해야 합니다',
         text: canRetry
-          ? '아직 방을 클릭하지 않았습니다. 전체 목록 끝을 보장하려면 상한 늘려 전체 목록 다시 확인을 눌러 후보 확인부터 다시 진행하세요.'
-          : '아직 방을 클릭하지 않았습니다. 가능한 상한을 이미 최대로 올린 상태입니다. 현재 후보만 백업할 수 있지만 전체 목록이 끝났다고 보장하기 어렵습니다.',
+          ? '아직 개별 채팅방 백업을 시작하지 않았습니다. 전체 목록 끝을 보장하려면 상한 늘려 전체 목록 다시 확인을 눌러 후보 확인부터 다시 진행하세요.'
+          : '아직 개별 채팅방 백업을 시작하지 않았습니다. 가능한 상한을 이미 최대로 올린 상태입니다. 현재 후보만 백업할 수 있지만 전체 목록이 끝났다고 보장하기 어렵습니다.',
       };
     }
     if (candidateEmpty) {
@@ -1523,10 +1523,10 @@ function batchLimitValue(value, fallback, max, step) {
 function expandedBatchPreviewJob(module, params = {}, limitKind = 'both') {
   if (module !== 'kakao' && module !== 'wechat') return null;
   const platformLabel = module === 'wechat' ? '위챗' : '카카오톡';
-  const currentPages = Number.isInteger(Number(params.pages)) && Number(params.pages) > 0 ? Number(params.pages) : 80;
-  const currentRoomLimit = Number.isInteger(Number(params.roomLimit)) && Number(params.roomLimit) > 0 ? Number(params.roomLimit) : 200;
-  const nextPages = limitKind === 'room' ? currentPages : batchLimitValue(currentPages, 80, 200, 40);
-  const nextRoomLimit = limitKind === 'page' ? currentRoomLimit : batchLimitValue(currentRoomLimit, 200, 500, 100);
+  const currentPages = Number.isInteger(Number(params.pages)) && Number(params.pages) > 0 ? Number(params.pages) : 500;
+  const currentRoomLimit = Number.isInteger(Number(params.roomLimit)) && Number(params.roomLimit) > 0 ? Number(params.roomLimit) : 2000;
+  const nextPages = limitKind === 'room' ? currentPages : batchLimitValue(currentPages, 500, 500, 100);
+  const nextRoomLimit = limitKind === 'page' ? currentRoomLimit : batchLimitValue(currentRoomLimit, 2000, 2000, 500);
   if (nextPages === currentPages && nextRoomLimit === currentRoomLimit) return null;
   return {
     module,
@@ -1978,9 +1978,9 @@ async function backupView() {
             <details class="advanced-options">
               <summary>고급 옵션</summary>
               <div class="field-grid">
-                <label>페이지 상한<input id="wechatPages" type="number" min="1" max="200" value="80"></label>
-                <label>방 개수 상한<input id="wechatRoomLimit" type="number" min="1" max="500" value="200"></label>
-                <label>캡처 수<input id="wechatBatchFrames" type="number" min="1" max="800" value="120"></label>
+                <label>페이지 상한<input id="wechatPages" type="number" min="1" max="500" value="500"></label>
+                <label>방 개수 상한<input id="wechatRoomLimit" type="number" min="1" max="2000" value="2000"></label>
+                <label>방별 캡처 상한<input id="wechatBatchFrames" type="number" min="1" max="800" value="800"></label>
                 <label>방 재시도 횟수<input id="wechatRoomRetries" type="number" min="0" max="5" value="1"></label>
                 <label class="check-label"><input id="wechatDirectAuto" type="checkbox" checked> 1:1방 이름 자동 적용</label>
                 <label class="check-label"><input id="wechatAllVisible" type="checkbox" checked> 끝까지 자동 스크롤</label>
@@ -2058,9 +2058,9 @@ async function backupView() {
             <details class="advanced-options">
               <summary>고급 옵션</summary>
               <div class="field-grid">
-                <label>페이지 상한<input id="kakaoPages" type="number" min="1" max="200" value="80"></label>
-                <label>방 개수 상한<input id="kakaoRoomLimit" type="number" min="1" max="500" value="200"></label>
-                <label>캡처 수<input id="kakaoBatchFrames" type="number" min="1" max="500" value="120"></label>
+                <label>페이지 상한<input id="kakaoPages" type="number" min="1" max="500" value="500"></label>
+                <label>방 개수 상한<input id="kakaoRoomLimit" type="number" min="1" max="2000" value="2000"></label>
+                <label>방별 캡처 상한<input id="kakaoBatchFrames" type="number" min="1" max="500" value="500"></label>
                 <label>방 재시도 횟수<input id="kakaoRoomRetries" type="number" min="0" max="5" value="1"></label>
                 <label class="check-label"><input id="kakaoBatchBottom" type="checkbox" checked> 아래까지 스크롤</label>
                 <label class="check-label"><input id="kakaoAllVisible" type="checkbox" checked> 끝까지 자동 스크롤</label>
@@ -2183,9 +2183,9 @@ async function backupView() {
     },
   );
   const kakaoBatchParams = (dryRun = false) => ({
-    pages: numberValue('#kakaoPages', checked('#kakaoAllVisible') ? 80 : 1),
-    roomLimit: numberValue('#kakaoRoomLimit', checked('#kakaoAllVisible') ? 200 : 5),
-    maxFrames: numberValue('#kakaoBatchFrames', 120),
+    pages: numberValue('#kakaoPages', checked('#kakaoAllVisible') ? 500 : 1),
+    roomLimit: numberValue('#kakaoRoomLimit', checked('#kakaoAllVisible') ? 2000 : 5),
+    maxFrames: numberValue('#kakaoBatchFrames', 500),
     roomRetries: numberValue('#kakaoRoomRetries', 1),
     toBottom: checked('#kakaoBatchBottom'),
     allVisible: checked('#kakaoAllVisible'),
@@ -2243,9 +2243,9 @@ async function backupView() {
     }, '지금 열린 위챗 방 백업');
   });
   const wechatBatchParams = (dryRun = false) => ({
-    pages: numberValue('#wechatPages', checked('#wechatAllVisible') ? 80 : 1),
-    roomLimit: numberValue('#wechatRoomLimit', checked('#wechatAllVisible') ? 200 : 5),
-    maxFrames: numberValue('#wechatBatchFrames', 120),
+    pages: numberValue('#wechatPages', checked('#wechatAllVisible') ? 500 : 1),
+    roomLimit: numberValue('#wechatRoomLimit', checked('#wechatAllVisible') ? 2000 : 5),
+    maxFrames: numberValue('#wechatBatchFrames', 800),
     roomRetries: numberValue('#wechatRoomRetries', 1),
     directChatAuto: checked('#wechatDirectAuto'),
     allVisible: checked('#wechatAllVisible'),

@@ -26,8 +26,8 @@ for (let i = 2; i < process.argv.length; i++) {
 const jsonPath = args.get('json');
 const crop = args.get('crop') || '520x900+0+80';
 const maxRooms = Number(args.get('max-rooms') || 30);
-const minY = Number(args.get('min-y') || 20);
-const rowGap = Number(args.get('row-gap') || 92);
+const minYArg = args.get('min-y');
+const rowGapArg = args.get('row-gap');
 const absoluteCoords = args.has('absolute-coords') && args.get('absolute-coords') !== 'false';
 
 if (!jsonPath) {
@@ -44,6 +44,8 @@ const cropWidth = Number(cropMatch[1]);
 const cropHeight = Number(cropMatch[2]);
 const cropX = Number(cropMatch[3]);
 const cropY = Number(cropMatch[4]);
+const minY = Number(minYArg ?? Math.max(20, Math.floor(cropHeight * 0.06)));
+const rowGap = Number(rowGapArg ?? Math.max(120, Math.min(140, Math.round(cropHeight * 0.086))));
 
 let lines = [];
 try {
@@ -86,7 +88,6 @@ function isUiOrPreview(text, line = {}) {
   if (/^(카카오톡|KakaoTalk|친구|채팅|오픈채팅|쇼핑|더보기|검색|설정|프로필|내\s*프로필|톡서랍|톡캘린더|전체|채널|뷰|게임|지갑)$/iu.test(t)) return true;
   if (/^(말풍선|대화|채팅방|읽음|안읽음|알림|메뉴|편집|새로운 채팅|새 채팅)$/u.test(t)) return true;
   if (/^(광고|추천|업데이트|공지|이벤트|카카오프렌즈)$/u.test(t)) return true;
-  if (/^(사진|동영상|이모티콘|파일|보이스톡|페이스톡|지도|연락처)$/u.test(t)) return true;
   if (/^\d+$/u.test(t)) return true;
   if (/^[(){}\[\]<>+\-_=~.,:;|/\\'"!?]+$/u.test(t)) return true;
   if (x < 48 && charLen(t) <= 4) return true;
@@ -100,6 +101,18 @@ function lineLooksLikePreview(text) {
   if (/^https?:\/\//iu.test(t)) return true;
   if (/[.?!。？！…]$/u.test(t) && charLen(t) > 10) return true;
   return false;
+}
+
+function candidateKind(label) {
+  return /^조용한채팅방$/u.test(norm(label)) ? 'quiet_folder' : 'room';
+}
+
+function folderRoomCount(cluster) {
+  for (const line of cluster.lines) {
+    const match = clean(line.text).match(/(\d[\d,]*)\s*개의?\s*[채재]팅방/u);
+    if (match) return Number(match[1].replace(/,/gu, ''));
+  }
+  return null;
 }
 
 const usable = lines
@@ -127,9 +140,11 @@ const usable = lines
   .sort((a, b) => (a.y - b.y) || (a.x - b.x));
 
 const clusters = [];
+const chainGap = Math.max(38, rowGap * 0.38);
 for (const line of usable) {
   const cy = line.y + line.h / 2;
-  let cluster = clusters.find((item) => Math.abs(item.anchorCy - cy) <= rowGap / 2);
+  let cluster = clusters[clusters.length - 1];
+  if (cluster && cy - cluster.maxCy > chainGap) cluster = null;
   if (!cluster) {
     cluster = { cy, anchorCy: cy, minCy: cy, maxCy: cy, lines: [] };
     clusters.push(cluster);
@@ -144,19 +159,18 @@ function lineScore(line, cluster) {
   let score = 0;
   const len = charLen(line.text);
   const clusterTop = Math.min(...cluster.lines.map((item) => item.y));
-  if (line.x >= 64 && line.x <= cropWidth * 0.76) score += 30;
+  if (line.x >= 64 && line.x <= cropWidth * 0.65) score += 30;
   if (len >= 2 && len <= 30) score += 26;
   if (/[\p{Script=Hangul}\p{Script=Han}A-Za-z0-9]/u.test(line.text)) score += 18;
   if (line.y <= clusterTop + 26) score += 16;
   if (line.conf !== null) score += Math.max(0, Math.min(18, Math.round(line.conf / 6)));
   if (lineLooksLikePreview(line.text)) score -= 28;
   if (charLen(line.text) > 42) score -= 24;
-  if (line.x > cropWidth * 0.78) score -= 22;
+  if (line.x > cropWidth * 0.65) score -= 35;
   if (isTimestampOrDate(line.text)) score -= 40;
   return score;
 }
 
-const seen = new Set();
 const rooms = [];
 for (const cluster of clusters.sort((a, b) => a.cy - b.cy)) {
   const sorted = [...cluster.lines].sort((a, b) => lineScore(b, cluster) - lineScore(a, cluster));
@@ -164,13 +178,15 @@ for (const cluster of clusters.sort((a, b) => a.cy - b.cy)) {
   if (!labelLine) continue;
   const label = cleanLabel(labelLine.text) || clean(labelLine.text);
   const key = norm(label);
-  if (!key || key.length < 2 || seen.has(key)) continue;
-  seen.add(key);
+  if (!key || key.length < 2) continue;
+  const kind = candidateKind(label);
   const clusterTop = Math.min(...cluster.lines.map((line) => line.y));
   const clusterBottom = Math.max(...cluster.lines.map((line) => line.y + line.h));
   const clickY = Math.round(cropY + Math.max(cluster.cy, clusterTop + 22, Math.min(clusterBottom + 18, cropHeight - 18)));
   rooms.push({
     label,
+    kind,
+    folder_room_count: kind === 'quiet_folder' ? folderRoomCount(cluster) : null,
     confidence: labelLine.conf,
     source: {
       x: labelLine.x,

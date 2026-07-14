@@ -106,6 +106,8 @@ const unreadableLineFrames = frameLineCounts.filter((entry) => entry.unreadable)
 
 const frameCount = Number(capture.frame_count ?? stats.frames ?? framePngs.length ?? 0);
 const maxFrames = Number(capture.max_frames ?? 0);
+const topReached = typeof capture.top_reached === 'boolean' ? capture.top_reached : null;
+const bottomReached = typeof capture.bottom_reached === 'boolean' ? capture.bottom_reached : null;
 const messages = Number(stats.messages ?? 0);
 const rawOcrLines = Number(stats.raw_ocr_lines ?? 0);
 const unknownSpeakers = Number(stats.unknown_speaker_messages ?? 0);
@@ -118,6 +120,8 @@ const dateMarkers = Array.isArray(stats.date_markers) ? stats.date_markers : [];
 if (frameCount <= 0) addIssue('fail', 'no captured frames were found');
 if (messages === 0 || rawOcrLines < 2) addIssue('fail', `no usable message OCR detected (messages=${messages}, raw_ocr_lines=${rawOcrLines})`);
 if (maxFrames > 0 && frameCount >= maxFrames) addIssue('review', 'capture stopped at max_frames; full history is not proven');
+if (topReached === false && !(maxFrames > 0 && frameCount >= maxFrames)) addIssue('review', 'oldest message was not proven reached');
+if (capture.to_bottom && bottomReached === false) addIssue('review', 'newest message was not proven reached');
 if (unknownSpeakers > 0) addIssue('review', `${plural(unknownSpeakers, 'message')} ${unknownSpeakers === 1 ? 'has' : 'have'} unknown speaker attribution`);
 if (lowConfidenceTextIds.length > 0) addIssue('review', `${plural(lowConfidenceTextIds.length, 'text message')} ${lowConfidenceTextIds.length === 1 ? 'has' : 'have'} low OCR confidence`);
 if (nonTextIds.length > 0) addIssue('review', `${plural(nonTextIds.length, 'attachment/media-card entry', 'attachment/media-card entries')} ${nonTextIds.length === 1 ? 'requires' : 'require'} original WeChat review`);
@@ -173,6 +177,8 @@ const metrics = {
     png_files: framePngs.length,
     max_frames: maxFrames || null,
     stopped_at_max_frames: maxFrames > 0 ? frameCount >= maxFrames : null,
+    top_reached: topReached,
+    bottom_reached: bottomReached,
   },
   ocr: {
     raw_lines: rawOcrLines,

@@ -10,7 +10,7 @@
 #   powershell -File kakao_window.ps1 key     -Hwnd 123 -Keys "{ESC}"
 # ============================================================================
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('list','rect','front','capture','scroll','click','key')][string]$Cmd,
+  [Parameter(Mandatory=$true)][ValidateSet('list','rect','front','capture','scroll','click','doubleclick','key')][string]$Cmd,
   [long]$Hwnd = 0,
   [string]$ProcName = 'KakaoTalk',
   [string]$Title = '',
@@ -79,6 +79,7 @@ public class KakaoWin {
       Process.GetProcessesByName(procName).Select(p => (uint)p.Id)
     );
     List<string> lines = new List<string>();
+    IntPtr foreground = GetForegroundWindow();
     EnumWindows(delegate(IntPtr wh, IntPtr lp) {
       if (!IsWindowVisible(wh)) return true;
       uint pid; GetWindowThreadProcessId2(wh, out pid);
@@ -88,10 +89,38 @@ public class KakaoWin {
       if (String.IsNullOrEmpty(title) || String.IsNullOrEmpty(rect)) return true;
       if (!String.IsNullOrEmpty(titleFilter) &&
           title.IndexOf(titleFilter, StringComparison.OrdinalIgnoreCase) < 0) return true;
-      lines.Add("WINDOW hwnd=" + wh.ToInt64() + " pid=" + pid + " rect=" + rect + " title=" + title);
+      lines.Add("WINDOW hwnd=" + wh.ToInt64() + " pid=" + pid + " rect=" + rect + " foreground=" + (wh == foreground) + " title=" + title);
       return true;
     }, IntPtr.Zero);
     return lines.ToArray();
+  }
+  public static IntPtr FindWindow(string procName, string titleFilter) {
+    HashSet<uint> pids = new HashSet<uint>(
+      Process.GetProcessesByName(procName).Select(p => (uint)p.Id)
+    );
+    IntPtr exact = IntPtr.Zero, contains = IntPtr.Zero, largest = IntPtr.Zero;
+    long largestArea = -1;
+    EnumWindows(delegate(IntPtr wh, IntPtr lp) {
+      if (!IsWindowVisible(wh)) return true;
+      uint pid; GetWindowThreadProcessId2(wh, out pid);
+      if (!pids.Contains(pid)) return true;
+      string title = WindowTitle(wh);
+      RECT rect;
+      if (String.IsNullOrEmpty(title) || !GetWindowRect(wh, out rect)) return true;
+      int width = rect.Right - rect.Left, height = rect.Bottom - rect.Top;
+      if (width <= 0 || height <= 0 || rect.Left <= -30000 || rect.Top <= -30000) return true;
+      if (!String.IsNullOrEmpty(titleFilter)) {
+        if (String.Equals(title, titleFilter, StringComparison.OrdinalIgnoreCase)) exact = wh;
+        else if (contains == IntPtr.Zero && title.IndexOf(titleFilter, StringComparison.OrdinalIgnoreCase) >= 0) contains = wh;
+        return true;
+      }
+      long area = (long)width * height;
+      if (area > largestArea) { largestArea = area; largest = wh; }
+      return true;
+    }, IntPtr.Zero);
+    if (exact != IntPtr.Zero) return exact;
+    if (contains != IntPtr.Zero) return contains;
+    return largest;
   }
   public static bool Capture(IntPtr h, string path) {
     RECT r; GetWindowRect(h, out r);
@@ -120,6 +149,11 @@ public class KakaoWin {
     System.Threading.Thread.Sleep(25);
     mouse_event(MEF_LU, 0, 0, 0, UIntPtr.Zero);
   }
+  public static void DoubleClick(int x, int y) {
+    Click(x, y);
+    System.Threading.Thread.Sleep(80);
+    Click(x, y);
+  }
 }
 "@
 
@@ -127,14 +161,12 @@ public class KakaoWin {
 
 function Resolve-Hwnd {
   if ($Hwnd -ne 0) { return [IntPtr]$Hwnd }
-  $candidates = Get-Process -Name $ProcName -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero }
-  if (-not [string]::IsNullOrEmpty($Title)) {
-    $candidates = $candidates | Where-Object { $_.MainWindowTitle -like "*$Title*" }
+  $resolved = [KakaoWin]::FindWindow($ProcName, $Title)
+  if ($resolved -eq [IntPtr]::Zero -and $Title -eq '카카오톡') {
+    $resolved = [KakaoWin]::FindWindow($ProcName, 'KakaoTalk')
   }
-  $proc = $candidates | Select-Object -First 1
-  if ($null -eq $proc) { Write-Output "NO WINDOW proc=$ProcName title=$Title"; exit 1 }
-  return $proc.MainWindowHandle
+  if ($resolved -eq [IntPtr]::Zero) { Write-Output "NO WINDOW proc=$ProcName title=$Title"; exit 1 }
+  return $resolved
 }
 
 if ($Cmd -eq 'list') {
@@ -181,6 +213,11 @@ switch ($Cmd) {
     if ($X -lt 0 -or $Y -lt 0) { Write-Output "REFUSED click invalid coords X=$X Y=$Y"; exit 2 }
     [KakaoWin]::Click($X, $Y)
     Write-Output "CLICK hwnd=$h rect=$rect x=$X y=$Y"
+  }
+  'doubleclick' {
+    if ($X -lt 0 -or $Y -lt 0) { Write-Output "REFUSED doubleclick invalid coords X=$X Y=$Y"; exit 2 }
+    [KakaoWin]::DoubleClick($X, $Y)
+    Write-Output "DOUBLECLICK hwnd=$h rect=$rect x=$X y=$Y"
   }
   'key' {
     if ([string]::IsNullOrEmpty($Keys)) { Write-Output "REFUSED key empty Keys"; exit 2 }

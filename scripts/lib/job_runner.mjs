@@ -153,7 +153,7 @@ export function defaultJobCatalog(pathConfig = loadPathConfig()) {
   const kakaoOpenWindowsJob = ({ maxFrames, toBottom } = {}) => {
     const frames = intParam(maxFrames, '캡처 수', 40, 1, 500);
     if (process.platform !== 'win32') {
-      const args = ['kakao', 'chat-batch', '--confirm-local-backup', '--max-frames', String(frames)];
+      const args = ['kakao', 'chat-batch', '--confirm-local-backup', '--active-only', '--max-frames', String(frames)];
       if (toBottom !== false) args.push('--to-bottom');
       return cuJob(args, ['node', 'jq']);
     }
@@ -162,6 +162,7 @@ export function defaultJobCatalog(pathConfig = loadPathConfig()) {
       join(repo, 'scripts', 'kakao_regular_chat.mjs'),
       'chat-batch',
       '--confirm-local-backup',
+      '--active-only',
       '--max-frames',
       String(frames),
     ];
@@ -172,7 +173,7 @@ export function defaultJobCatalog(pathConfig = loadPathConfig()) {
     const query = textParam(pattern, '카카오톡 방 이름', { required: true, max: 80 });
     const frames = intParam(maxFrames, '캡처 수', 40, 1, 500);
     if (process.platform !== 'win32') {
-      const args = ['kakao', 'chat-batch', '--confirm-local-backup', '--open-visible', query, '--max-frames', String(frames)];
+      const args = ['kakao', 'chat-batch', '--confirm-local-backup', '--active-only', '--open-visible', query, '--max-frames', String(frames)];
       if (toBottom !== false) args.push('--to-bottom');
       return cuJob(args, ['node', 'jq']);
     }
@@ -181,6 +182,7 @@ export function defaultJobCatalog(pathConfig = loadPathConfig()) {
       join(repo, 'scripts', 'kakao_regular_chat.mjs'),
       'chat-batch',
       '--confirm-local-backup',
+      '--active-only',
       '--open-visible',
       query,
       '--max-frames',
@@ -191,9 +193,9 @@ export function defaultJobCatalog(pathConfig = loadPathConfig()) {
   };
   const kakaoVisibleBatchJob = ({ pages, roomLimit, maxFrames, roomRetries, dryRun, allVisible, toBottom } = {}) => {
     const fullList = allVisible !== false;
-    const pageCount = intParam(pages, '페이지 수', fullList ? 80 : 1, 1, 200);
-    const rooms = intParam(roomLimit, '방 개수', fullList ? 200 : 5, 1, 500);
-    const frames = intParam(maxFrames, '캡처 수', fullList ? 120 : 40, 1, 500);
+    const pageCount = intParam(pages, '페이지 수', fullList ? 500 : 1, 1, 500);
+    const rooms = intParam(roomLimit, '방 개수', fullList ? 2000 : 5, 1, 2000);
+    const frames = intParam(maxFrames, '캡처 수', fullList ? 500 : 40, 1, 500);
     const retries = intParam(roomRetries, '방 재시도 횟수', 1, 0, 5);
     if (process.platform !== 'win32') {
       const args = ['kakao', 'chat-batch', '--confirm-local-backup', '--max-frames', String(frames)];
@@ -286,9 +288,9 @@ export function defaultJobCatalog(pathConfig = loadPathConfig()) {
   };
   const wechatVisibleBatchJob = ({ pages, roomLimit, maxFrames, roomRetries, directChatAuto, dryRun, allVisible } = {}) => {
     const fullList = allVisible !== false;
-    const pageCount = intParam(pages, '페이지 수', fullList ? 80 : 1, 1, 200);
-    const rooms = intParam(roomLimit, '방 개수', fullList ? 200 : 5, 1, 500);
-    const frames = intParam(maxFrames, '캡처 수', 120, 1, 800);
+    const pageCount = intParam(pages, '페이지 수', fullList ? 500 : 1, 1, 500);
+    const rooms = intParam(roomLimit, '방 개수', fullList ? 2000 : 5, 1, 2000);
+    const frames = intParam(maxFrames, '캡처 수', fullList ? 800 : 120, 1, 800);
     const retries = intParam(roomRetries, '방 재시도 횟수', 1, 0, 5);
     if (process.platform === 'win32') {
       const command = [

@@ -35,24 +35,31 @@ function usage() {
 }
 
 function resolveHwndByTitle(title) {
-  const res = run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', `${pathConfig.scriptsDirWin}\\uia.ps1`, 'list'], { cwd: repo });
-  const lines = res.stdout.split(/\r?\n/);
-  for (const line of lines) {
-    if (line.includes('proc=KakaoTalk') && line.includes(title)) {
-      const m = line.match(/hwnd=(\d+)/);
-      if (m) return m[1];
-    }
-  }
-  return null;
+  const needle = String(title || '').trim().toLowerCase();
+  if (!needle) return null;
+  const windows = listKakaoChatWindows();
+  const exact = windows.find((win) => String(win.title || '').trim().toLowerCase() === needle);
+  const partial = windows.find((win) => String(win.title || '').trim().toLowerCase().includes(needle));
+  return (exact || partial)?.hwnd || null;
 }
 
 function listKakaoWindows() {
-  const res = run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', `${pathConfig.scriptsDirWin}\\uia.ps1`, 'list'], { cwd: repo });
+  const res = run('powershell.exe', [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    `${pathConfig.scriptsDirWin}\\kakao_window.ps1`,
+    'list',
+    '-ProcName',
+    'KakaoTalk',
+  ], { cwd: repo });
   return res.stdout.split(/\r?\n/).map((line) => {
-    if (!line.includes('proc=KakaoTalk') && !/^KakaoTalk\s+/u.test(line)) return null;
+    if (!/^WINDOW\s+/u.test(line)) return null;
     const hwnd = line.match(/hwnd=(\d+)/)?.[1];
-    const title = line.match(/\]\s*(.*)$/)?.[1]?.trim() || '';
-    return hwnd ? { hwnd, title } : null;
+    const title = line.match(/\btitle=(.*)$/u)?.[1]?.trim() || '';
+    const foreground = /\bforeground=True\b/iu.test(line);
+    return hwnd ? { hwnd, title, foreground } : null;
   }).filter(Boolean);
 }
 
@@ -69,13 +76,23 @@ function openVisibleRoom(pattern) {
   const query = String(pattern || '').trim();
   if (!query) throw new Error('--open-visible requires an OCR-visible room-name regex');
   if (process.platform === 'win32' || args['windows-native']) return openVisibleRoomWindowsNative(query);
+  const beforeWindows = listKakaoWindows();
   run('bash', [cuScript, 'wake', 'title:카카오톡'], { cwd: repo });
   const clicked = run('bash', [cuScript, 'clicktext', 'title:카카오톡', query, '--double'], { cwd: repo });
   if (!clicked.ok) {
     throw new Error(`could not open visible Kakao room /${query}/: ${clicked.stderr || clicked.stdout}`);
   }
   run('bash', ['-lc', 'sleep 1.5'], { cwd: repo });
-  return clicked.stdout.trim();
+  const beforeHwnds = new Set(beforeWindows.map((win) => String(win.hwnd)));
+  const chatWindows = listKakaoChatWindows();
+  const newWindows = chatWindows.filter((win) => !beforeHwnds.has(String(win.hwnd)));
+  const selected = newWindows[0] || chatWindows.find((win) => win.foreground) || null;
+  return {
+    message: clicked.stdout.trim(),
+    hwnd: selected?.hwnd || null,
+    title: selected?.title || '',
+    opened_new: Boolean(selected && newWindows.some((win) => String(win.hwnd) === String(selected.hwnd))),
+  };
 }
 
 function openVisibleRoomWindowsNative(pattern) {
@@ -123,29 +140,81 @@ function openVisibleRoomWindowsNative(pattern) {
   } catch (err) {
     throw new Error(`KakaoTalk room list OCR returned invalid JSON: ${err.message}`);
   }
-  const hit = lines.find((line) => matcher.test(String(line.text || '')));
-  if (!hit) throw new Error(`KakaoTalk 목록에서 /${pattern}/ 방 이름을 찾지 못했습니다`);
-  const x = Math.floor(left + Number(hit.x || 0) + Number(hit.w || 0) / 2);
-  const y = Math.floor(top + Number(hit.y || 0) + Number(hit.h || 0) / 2);
-  for (let i = 0; i < 2; i++) {
-    const click = run('powershell.exe', [
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-File',
-      `${pathConfig.scriptsDirWin}\\kakao_window.ps1`,
-      'click',
-      '-Hwnd',
-      hwnd,
-      '-X',
-      String(x),
-      '-Y',
-      String(y),
-    ], { cwd: repo });
-    if (!click.ok) throw new Error(`KakaoTalk room click failed: ${click.stderr || click.stdout}`);
+  const ocrJson = join(shotsDirLocal, '_kakao_visible_room.json');
+  writeFileSync(ocrJson, `${JSON.stringify(lines, null, 2)}\n`, 'utf8');
+  const width = Number(rect[3]) - left;
+  const height = Number(rect[4]) - top;
+  const listWidth = Math.max(320, Math.min(width, Math.floor(width * 0.98)));
+  const listY = Math.max(64, Math.floor(height * 0.08));
+  const listHeight = Math.max(220, height - listY - 44);
+  const candidatesResult = run(process.execPath, [
+    join(repo, 'scripts', 'kakao_rooms_from_ocr.mjs'),
+    '--json',
+    ocrJson,
+    '--crop',
+    `${listWidth}x${listHeight}+0+${listY}`,
+    '--absolute-coords',
+    '--max-rooms',
+    '200',
+  ], { cwd: repo });
+  if (!candidatesResult.ok) throw new Error(`KakaoTalk 방 목록 분석 실패: ${candidatesResult.stderr || candidatesResult.stdout}`);
+  let candidates = [];
+  try {
+    candidates = JSON.parse(candidatesResult.stdout || '{}').rooms || [];
+  } catch (err) {
+    throw new Error(`KakaoTalk 방 목록 분석 결과를 읽지 못했습니다: ${err.message}`);
   }
+  const hit = candidates.find((room) => matcher.test(String(room.label || '')));
+  if (!hit) throw new Error(`KakaoTalk 목록에서 /${pattern}/ 방 이름을 찾지 못했습니다`);
+  const x = Math.floor(left + Number(hit.click_x || 0));
+  const y = Math.floor(top + Number(hit.click_y || 0));
+  const beforeWindows = listKakaoWindows();
+  const click = run('powershell.exe', [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    `${pathConfig.scriptsDirWin}\\kakao_window.ps1`,
+    'doubleclick',
+    '-Hwnd',
+    hwnd,
+    '-X',
+    String(x),
+    '-Y',
+    String(y),
+  ], { cwd: repo });
+  if (!click.ok) throw new Error(`KakaoTalk room double-click failed: ${click.stderr || click.stdout}`);
   run('powershell.exe', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 1500'], { cwd: repo });
-  return `clicked KakaoTalk room /${pattern}/ at ${x},${y}`;
+  const beforeHwnds = new Set(beforeWindows.map((win) => String(win.hwnd)));
+  const chatWindows = listKakaoChatWindows();
+  const newWindows = chatWindows.filter((win) => !beforeHwnds.has(String(win.hwnd)));
+  const selected = newWindows.find((win) => matcher.test(String(win.title || '')))
+    || (newWindows.length === 1 ? newWindows[0] : null)
+    || chatWindows.find((win) => matcher.test(String(win.title || '')))
+    || chatWindows.find((win) => win.foreground);
+  if (!selected?.hwnd) throw new Error(`KakaoTalk 목록에서 /${pattern}/ 방을 눌렀지만 열린 채팅창을 확인하지 못했습니다`);
+  return {
+    message: `clicked KakaoTalk room /${pattern}/ at ${x},${y}`,
+    hwnd: selected.hwnd,
+    title: selected.title,
+    opened_new: newWindows.some((win) => String(win.hwnd) === String(selected.hwnd)),
+  };
+}
+
+function closeKakaoWindow(hwnd) {
+  if (!hwnd) return;
+  run('powershell.exe', [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    `${pathConfig.scriptsDirWin}\\kakao_window.ps1`,
+    'key',
+    '-Hwnd',
+    String(hwnd),
+    '-Keys',
+    '%{F4}',
+  ], { cwd: repo });
 }
 
 function windowsPathToWsl(path) {
@@ -175,7 +244,8 @@ function scrapeChatWindowsNative({ hwnd, maxFrames, toBottom, outDir }) {
   process.stderr.write(capture.stderr || '');
   process.stdout.write(capture.stdout || '');
   if (!capture.ok) throw new Error('scrape_capture.ps1 failed');
-  const dirWin = (capture.stdout + capture.stderr).match(/DIR=(.+)$/m)?.[1]?.trim();
+  const captureText = capture.stdout + capture.stderr;
+  const dirWin = captureText.match(/DIR=(.+)$/m)?.[1]?.trim();
   if (!dirWin) throw new Error('capture did not report DIR=');
   const dir = localScrapeDirPath(dirWin);
   const frames = readdirSync(dir).filter((file) => /^frame_\d+\.png$/u.test(file)).sort();
@@ -198,7 +268,16 @@ function scrapeChatWindowsNative({ hwnd, maxFrames, toBottom, outDir }) {
   if (!stitch.ok) throw new Error(`stitch failed: ${stitch.stderr || stitch.stdout}`);
   writeFileSync(join(dir, 'transcript.txt'), stitch.stdout, 'utf8');
   console.log(`TRANSCRIPT=${process.platform === 'win32' ? join(dir, 'transcript.txt') : `${dir}/transcript.txt`}  (${stitch.stdout.split(/\r?\n/u).filter(Boolean).length} lines)`);
-  return dir;
+  const topMatch = captureText.match(/\bTOP_REACHED=(True|False)\b/iu);
+  const bottomMatch = captureText.match(/\bBOTTOM_REACHED=(True|False)\b/iu);
+  return {
+    dir,
+    capture: {
+      stopReason: captureText.match(/\bSTOP_REASON=([^\s]+)/u)?.[1] || null,
+      topReached: topMatch ? topMatch[1].toLowerCase() === 'true' : null,
+      bottomReached: bottomMatch ? bottomMatch[1].toLowerCase() === 'true' : null,
+    },
+  };
 }
 
 function isKakaoTimestamp(text) {
@@ -492,8 +571,12 @@ function structureDir(dir, roomLabel = 'KakaoTalk chat', incomingSpeaker = null,
   };
   const maxFrames = Number(captureOptions.maxFrames || 0);
   const hitMaxFrames = maxFrames > 0 && jsonFiles.length >= maxFrames;
+  const topReached = typeof captureOptions.topReached === 'boolean' ? captureOptions.topReached : null;
+  const bottomReached = typeof captureOptions.bottomReached === 'boolean' ? captureOptions.bottomReached : null;
   const qualityNotes = [
     hitMaxFrames ? 'capture stopped at max_frames; full history is not proven' : '',
+    topReached === false && !hitMaxFrames ? 'capture ended without proving the oldest message was reached' : '',
+    captureOptions.toBottom && bottomReached === false ? 'capture did not prove the newest message was reached before scrolling upward' : '',
   ].filter(Boolean);
   const doc = { schema: 'kakao_regular_messages.v1', room: roomLabel, stats, messages: finalMessages };
   writeJson(join(dir, 'kakao_messages.json'), doc);
@@ -506,6 +589,9 @@ function structureDir(dir, roomLabel = 'KakaoTalk chat', incomingSpeaker = null,
       max_frames: maxFrames || null,
       to_bottom: Boolean(captureOptions.toBottom),
       stopped_at_max_frames: maxFrames > 0 ? hitMaxFrames : null,
+      stop_reason: captureOptions.stopReason || null,
+      top_reached: topReached,
+      bottom_reached: bottomReached,
     },
     quality: {
       status: stats.messages ? 'review' : 'fail',
@@ -526,10 +612,14 @@ function audit(dir, check = false) {
   const ocrCount = existsSync(dir) ? readdirSync(dir).filter((f) => /^frame_\d+\.json$/.test(f)).length : 0;
   const maxFrames = Number(manifest.capture?.max_frames || manifest.quality?.max_frames || 0);
   const hitMaxFrames = maxFrames > 0 && frameCount >= maxFrames;
+  const topReached = typeof manifest.capture?.top_reached === 'boolean' ? manifest.capture.top_reached : null;
+  const bottomReached = typeof manifest.capture?.bottom_reached === 'boolean' ? manifest.capture.bottom_reached : null;
   if (frameCount === 0) issues.push({ severity: 'fail', message: 'no frame PNG files' });
   if (ocrCount === 0) issues.push({ severity: 'fail', message: 'no OCR JSON files' });
-  if (frameCount > 0 && frameCount < 5) issues.push({ severity: 'review', message: 'short scrape; increase --max-frames/--to-bottom before treating as complete history' });
+  if (frameCount > 0 && frameCount < 5 && topReached !== true) issues.push({ severity: 'review', message: 'short scrape; increase --max-frames/--to-bottom before treating as complete history' });
   if (hitMaxFrames) issues.push({ severity: 'review', message: 'capture stopped at max_frames; full history is not proven' });
+  if (topReached === false && !hitMaxFrames) issues.push({ severity: 'review', message: 'oldest message was not proven reached' });
+  if (manifest.capture?.to_bottom && bottomReached === false) issues.push({ severity: 'review', message: 'newest message was not proven reached' });
   let messages = null;
   try { messages = readJson(join(dir, 'kakao_messages.json')); } catch {}
   if (messages && (messages.stats?.messages || 0) === 0) issues.push({ severity: 'fail', message: 'no structured messages' });
@@ -564,6 +654,8 @@ function audit(dir, check = false) {
       frames: frameCount,
       max_frames: maxFrames || null,
       stopped_at_max_frames: maxFrames > 0 ? hitMaxFrames : null,
+      top_reached: topReached,
+      bottom_reached: bottomReached,
       ocr: ocrCount,
       messages: messages?.stats?.messages || 0,
       lines_merged: messages?.stats?.lines_merged || 0,
@@ -590,13 +682,16 @@ async function scrapeChat() {
   if (!hwnd) throw new Error('missing or unresolved --title/--hwnd');
   const maxFrames = Number(args['max-frames'] || 40);
   let dir = null;
+  let captureMeta = {};
   if (process.platform === 'win32' || args['windows-native']) {
-    dir = scrapeChatWindowsNative({
+    const scraped = scrapeChatWindowsNative({
       hwnd,
       maxFrames,
       toBottom: Boolean(args['to-bottom']),
       outDir: args.out || args['out-dir'] || '',
     });
+    dir = scraped.dir;
+    captureMeta = scraped.capture || {};
   } else {
     const extra = ['scripts/scrape_room.sh', 'scrape', '-Hwnd', String(hwnd), '-MaxFrames', String(maxFrames)];
     if (args['to-bottom']) extra.push('-ToBottom');
@@ -614,6 +709,7 @@ async function scrapeChat() {
   structureDir(dir, args['room-label'] || title || 'KakaoTalk chat', args['incoming-speaker'] || null, {
     maxFrames,
     toBottom: Boolean(args['to-bottom']),
+    ...captureMeta,
   });
   audit(dir, false);
 }
@@ -627,10 +723,20 @@ try {
     if (!args['confirm-local-backup']) throw new Error('chat-batch requires --confirm-local-backup');
     const openPatterns = asArray(args['open-visible'] || args['visible-room']).filter(Boolean);
     const opened = [];
-    for (const pattern of openPatterns) opened.push({ pattern, result: openVisibleRoom(pattern) });
+    for (const pattern of openPatterns) opened.push({ pattern, ...openVisibleRoom(pattern) });
     const titles = asArray(args.title).filter(Boolean);
-    const windows = titles.length ? titles.map((title) => ({ title, hwnd: resolveHwndByTitle(title) })) : listKakaoChatWindows();
-    const targets = windows.filter((win) => win.hwnd);
+    const requestedTargets = opened.filter((item) => item.hwnd).map((item) => ({
+      title: item.title || item.pattern,
+      hwnd: item.hwnd,
+      close_after: Boolean(item.opened_new),
+    }));
+    const availableWindows = listKakaoChatWindows();
+    const windows = titles.length
+      ? titles.map((title) => ({ title, hwnd: resolveHwndByTitle(title), close_after: false }))
+      : (requestedTargets.length
+        ? requestedTargets
+        : (args['active-only'] ? [availableWindows.find((win) => win.foreground) || availableWindows[0]] : availableWindows));
+    const targets = [...new Map(windows.filter((win) => win?.hwnd).map((win) => [String(win.hwnd), win])).values()];
     if (!targets.length) {
       const mainOpen = listKakaoWindows().some(isMainKakaoWindow);
       printSummary({
@@ -647,8 +753,12 @@ try {
       for (const win of targets) {
         args.title = win.title;
         args.hwnd = win.hwnd;
-        await scrapeChat();
-        results.push({ title: win.title, hwnd: win.hwnd, status: 'attempted' });
+        try {
+          await scrapeChat();
+          results.push({ title: win.title, hwnd: win.hwnd, status: 'attempted' });
+        } finally {
+          if (win.close_after) closeKakaoWindow(win.hwnd);
+        }
       }
       printSummary({ schema: 'kakao_regular.batch.v1', status: 'PASS', attempted: results.length, opened, results });
     }

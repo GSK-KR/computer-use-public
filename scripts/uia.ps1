@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 # uia.ps1 -- general Windows UI Automation engine for the computer-use agent.
 #   Generalizes probe_uia_kakao.ps1 into a reusable read/find/act tool.
 #   UIA is the preferred channel: when an app exposes its

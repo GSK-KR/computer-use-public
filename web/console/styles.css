@@ -938,7 +938,7 @@ button.danger:hover {
 }
 
 .setup-help-panel {
-  order: 1;
+  order: 3;
   padding: 0;
   overflow: hidden;
 }
@@ -1432,6 +1432,10 @@ button.danger:hover {
 .workflow-task-list.batch-first .current-room-task {
   border-top: 1px solid var(--line);
   padding-top: 14px;
+}
+
+.workflow-task > .notice {
+  margin: 0;
 }
 
 .task-actions {
@@ -2474,20 +2478,43 @@ textarea {
   .view {
     overflow-x: hidden;
   }
-  .topbar { align-items: flex-start; flex-direction: column; position: static; }
-  .topbar > div:first-child,
-  .top-actions {
-    width: calc(100vw - 24px);
-    max-width: calc(100vw - 24px);
+  .topbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    position: static;
   }
-  .top-actions { justify-content: flex-start; }
+  .topbar > div:first-child {
+    flex: 1 1 180px;
+    max-width: 100%;
+  }
+  #pageMeta {
+    word-break: keep-all;
+  }
+  .top-actions {
+    flex: 0 1 auto;
+    max-width: 100%;
+    justify-content: flex-start;
+  }
   .active-job-badge {
     flex: 1 1 220px;
     max-width: 100%;
   }
+  .compact-backup-actions,
+  .workflow-panel .section-heading > .badge {
+    display: none;
+  }
+  .backup-switcher {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    overflow: hidden;
+  }
+  .backup-switcher > button {
+    width: 100%;
+  }
   .toolbar { align-items: stretch; }
   .toolbar > button,
-  .backup-switcher > button,
   .next-actions-buttons > button {
     flex: 1 1 118px;
   }
@@ -2563,11 +2590,12 @@ textarea {
 @media (max-width: 560px) {
   .sidebar, .topbar, .view { padding-left: 12px; padding-right: 12px; }
   .panel { padding: 12px; }
-  .nav,
-  .topbar > div:first-child,
-  .top-actions {
+  .nav {
     width: min(100%, 366px);
     max-width: min(100%, 366px);
+  }
+  .top-shortcut {
+    display: none;
   }
   .nav a {
     flex-basis: calc((100% - 12px) / 3);
@@ -2594,27 +2622,6 @@ textarea {
   .unavailable-actions > button {
     width: 100%;
     min-width: 0;
-  }
-  .backup-switcher {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: 100%;
-    overflow: hidden;
-  }
-  .backup-switcher > button {
-    width: 100%;
-    min-width: 0;
-  }
-  .compact-backup-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-  .compact-backup-actions > button {
-    flex: 1 1 110px;
-    min-width: 0;
-  }
-  .compact-backup-actions #backupJobs {
-    display: none;
   }
   .app-quick-actions {
     display: grid;

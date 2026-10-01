@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 # kakao_window.ps1 — exact-window capture/action primitives for KakaoTalk.
 #   Used by kakao_openchat_scrape.sh so a visible comment button can be clicked
 #   immediately while that scroll position is still on screen.
@@ -163,7 +163,10 @@ function Resolve-Hwnd {
   if ($Hwnd -ne 0) { return [IntPtr]$Hwnd }
   $resolved = [KakaoWin]::FindWindow($ProcName, $Title)
   if ($resolved -eq [IntPtr]::Zero -and $Title -eq '카카오톡') {
-    $resolved = [KakaoWin]::FindWindow($ProcName, 'KakaoTalk')
+    # English UI titles the main list window 'KakaoTalk'. Accept only that exact title so a
+    # chat room whose name merely contains it is never treated as the room list.
+    $fallback = [KakaoWin]::FindWindow($ProcName, 'KakaoTalk')
+    if ([KakaoWin]::WindowTitle($fallback) -eq 'KakaoTalk') { $resolved = $fallback }
   }
   if ($resolved -eq [IntPtr]::Zero) { Write-Output "NO WINDOW proc=$ProcName title=$Title"; exit 1 }
   return $resolved

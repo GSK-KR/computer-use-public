@@ -1888,7 +1888,7 @@ async function backupView() {
         <p>브라우저를 닫고 압축을 푼 폴더의 1_백업_시작.bat를 다시 더블클릭하세요. Windows가 파일 확장자를 숨기면 1_백업_시작으로 보일 수 있습니다. 보이지 않으면 시작하기 또는 시작하기.bat를 사용해도 됩니다.</p>
       </details>`
     : '';
-  const targetNotice = fullBackupTarget
+  const targetNotice = (app) => fullBackupTarget === app
     ? `<div class="notice focus-notice"><strong>${esc(targetLabel)} 통째 백업</strong> 앱의 왼쪽 채팅 목록을 보이게 둔 뒤 아래 준비 표시부터 진행하세요.</div>`
     : '';
   const returnNotice = backupReturnNotice
@@ -1919,8 +1919,6 @@ async function backupView() {
         ${returnNotice}
       </section>
 
-      ${captureNotice}
-
       <section id="wechat" class="panel span-12 workflow-panel wechat-workflow ${activeBackupTarget === 'wechat' ? 'target-focus' : ''}" ${activeBackupTarget === 'wechat' ? '' : 'hidden'}>
         <div class="section-heading">
           <div>
@@ -1937,7 +1935,6 @@ async function backupView() {
           <button type="button" data-refresh-ready>상태 새로고침</button>
         </div>
 
-        ${targetNotice}
         <div class="workflow-task-list ${fullBackupTarget === 'wechat' ? 'batch-first' : ''}">
           <section class="workflow-task current-room-task">
             <div class="backup-row">
@@ -1968,6 +1965,7 @@ async function backupView() {
                 <p>왼쪽 목록을 끝까지 확인하고 여러 방을 차례로 저장합니다.</p>
               </div>
             </div>
+            ${targetNotice('wechat')}
             ${batchListConfirmHtml('wechatBatchReady', 'wechatBatchReadyError', '위챗')}
             ${blockedNote(wechatBatchMissing)}
             <div class="task-actions">
@@ -2018,7 +2016,6 @@ async function backupView() {
           <button type="button" data-refresh-ready>상태 새로고침</button>
         </div>
 
-        ${targetNotice}
         <div class="workflow-task-list ${fullBackupTarget === 'kakao' ? 'batch-first' : ''}">
           <section class="workflow-task current-room-task">
             <div class="backup-row">
@@ -2048,6 +2045,7 @@ async function backupView() {
                 <p>왼쪽 목록을 끝까지 확인하고 여러 방을 차례로 저장합니다.</p>
               </div>
             </div>
+            ${targetNotice('kakao')}
             ${batchListConfirmHtml('kakaoBatchReady', 'kakaoBatchReadyError', '카카오톡')}
             ${blockedNote(kakaoBatchMissing)}
             <div class="task-actions">
@@ -2112,6 +2110,8 @@ async function backupView() {
         </details>
         </details>
       </section>
+
+      ${captureNotice}
 
       <section class="panel span-12 backup-progress-panel">
         <div class="toolbar">

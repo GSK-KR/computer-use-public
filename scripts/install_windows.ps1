@@ -130,9 +130,10 @@ winget install OpenJS.NodeJS.LTS
 Write-InstallTroubleshootingFile
 
 function Invoke-WslText {
-  param([string[]]$Args)
+  # $Args는 PowerShell 자동 변수라 매개변수 이름으로 쓰면 항상 비어 wsl.exe가 인자 없이 실행된다.
+  param([string[]]$WslArgs)
   try {
-    $out = & wsl.exe @Args 2>&1
+    $out = & wsl.exe @WslArgs 2>&1
     if ($LASTEXITCODE -ne 0) { return [pscustomobject]@{ ok = $false; text = ($out -join "`n") } }
     return [pscustomobject]@{ ok = $true; text = ($out -join "`n") }
   } catch {
@@ -142,15 +143,15 @@ function Invoke-WslText {
 
 function Test-WslCommand {
   param([string]$Name, [string]$Command)
-  $r = Invoke-WslText -Args @('-e','bash','-lc', $Command)
+  $r = Invoke-WslText -WslArgs @('-e','bash','-lc', $Command)
   $status = if ($r.ok) { 'PASS' } else { 'REVIEW' }
   [pscustomobject]@{ name = $Name; status = $status; detail = $r.text.Trim() }
 }
 
 function Test-WindowsCommand {
-  param([string]$Name, [string]$Command, [string[]]$Args = @('--version'))
+  param([string]$Name, [string]$Command, [string[]]$CommandArgs = @('--version'))
   try {
-    $out = & $Command @Args 2>&1
+    $out = & $Command @CommandArgs 2>&1
     if ($LASTEXITCODE -eq 0) {
       return [pscustomobject]@{ name = $Name; status = 'PASS'; detail = (($out -join "`n").Trim()) }
     }
@@ -383,7 +384,7 @@ if (-not $ConfigOnly) {
     & $node (Join-Path $repoRootWin 'scripts\doctor.mjs')
   } else {
     Show-NodeInstallHelp
-    $wslDoctor = Invoke-WslText -Args @('-e','bash','-lc',"cd '$repoRootWsl' && node scripts/doctor.mjs")
+    $wslDoctor = Invoke-WslText -WslArgs @('-e','bash','-lc',"cd '$repoRootWsl' && node scripts/doctor.mjs")
     if ($wslDoctor.ok) {
       Write-Host $wslDoctor.text
     } else {

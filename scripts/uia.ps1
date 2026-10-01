@@ -13,6 +13,7 @@
 #   -Proc  <regex>   match by process name   (e.g. Notepad, chrome, Calc)
 #   -Title <regex>   match by window title    (e.g. '계산기', 'Calculator')
 #   -ProcId <int>    match by exact pid
+#   -Hwnd <long>     exact top-level window handle (from win32.ps1 list); overrides the others
 #
 # Commands:
 #   list                              top-level windows (proc,pid,title,rect,class)
@@ -32,7 +33,9 @@ param(
   [string]$Proc = '',
   [string]$Title = '',
   [int]$ProcId = 0,
+  [long]$Hwnd = 0,
   [string]$Query = '',
+  [string]$QueryFile = '',
   [string]$Text = '',
   [string]$TextFile = '',
   [string]$Expected = '',
@@ -154,7 +157,14 @@ elseif ($Proc -ne '') {
 }
 $havePidFilter = ($pidset.Count -gt 0)
 
+if (-not [string]::IsNullOrEmpty($QueryFile)) { $Query = (Get-Content -Raw -Encoding UTF8 $QueryFile).TrimEnd("`r","`n") }
+
 function Get-TopWindows {
+  if ($Hwnd -gt 0) {
+    $res = New-Object System.Collections.Generic.List[object]
+    try { $el = $A::FromHandle([IntPtr]$Hwnd); if ($null -ne $el) { $res.Add($el) } } catch {}
+    return $res
+  }
   $root = $A::RootElement
   $cw   = $W::ControlViewWalker
   $res  = New-Object System.Collections.Generic.List[object]
@@ -204,7 +214,7 @@ if ($Cmd -eq 'list') {
 }
 
 $targets = Get-TopWindows
-if ($targets.Count -eq 0) { Write-Output "NO WINDOW matching proc=/$Proc/ title=/$Title/ pid=$ProcId"; exit 1 }
+if ($targets.Count -eq 0) { Write-Output "NO WINDOW matching proc=/$Proc/ title=/$Title/ pid=$ProcId hwnd=$Hwnd"; exit 1 }
 
 # ---- FRONT (bring target window to foreground; works for Win32 + UWP via NativeWindowHandle) ----
 if ($Cmd -eq 'front') {

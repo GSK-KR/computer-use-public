@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve, posix } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -84,15 +84,31 @@ function resolveLocalPath(path) {
   return resolve(value);
 }
 
+// Windows 홈 폴더를 찾는다. 예전에는 powershell.exe가 3초 안에 응답하지 않으면 조용히 WSL 경로로 넘어가
+// 빈 Chrome 프로필이 새 포트로 하나 더 뜨는 문제가 있었다. 빠른 cmd.exe를 먼저 쓰고, 성공 값은 캐시한다.
 function windowsUserProfileWsl() {
   if (env('USERPROFILE')) return windowsPathToWsl(env('USERPROFILE'));
-  const ps = spawnSync(
-    'powershell.exe',
-    ['-NoProfile', '-Command', "[Environment]::GetFolderPath('UserProfile')"],
-    { encoding: 'utf8', timeout: 3000, windowsHide: true },
-  );
-  if (ps.status !== 0) return '';
-  return windowsPathToWsl(String(ps.stdout || '').trim());
+  const cacheFile = join(process.env.HOME || '/tmp', '.cache', 'computer-use', 'windows_userprofile.txt');
+  try {
+    const cached = readFileSync(cacheFile, 'utf8').trim();
+    if (cached && isDir(windowsPathToWsl(cached))) return windowsPathToWsl(cached);
+  } catch {}
+  const attempts = [
+    ['cmd.exe', ['/d', '/c', 'echo %USERPROFILE%'], 8000],
+    ['powershell.exe', ['-NoProfile', '-Command', "[Environment]::GetFolderPath('UserProfile')"], 15000],
+  ];
+  for (const [cmd, args, timeout] of attempts) {
+    const res = spawnSync(cmd, args, { encoding: 'utf8', timeout, windowsHide: true, cwd: isDir('/mnt/c') ? '/mnt/c' : undefined });
+    const value = String(res.stdout || '').trim().split(/\r?\n/u).pop()?.trim() || '';
+    if (res.status === 0 && /^[A-Za-z]:\\/u.test(value)) {
+      try {
+        mkdirSync(join(process.env.HOME || '/tmp', '.cache', 'computer-use'), { recursive: true });
+        writeFileSync(cacheFile, value, 'utf8');
+      } catch {}
+      return windowsPathToWsl(value);
+    }
+  }
+  return '';
 }
 
 function chooseMirrorRoot(repoRootWsl, config) {

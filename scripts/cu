@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# 카카오톡/위챗 백업과 Windows Chrome 자동화 공개 패키지용 보조 실행 파일입니다.
+# AI 에이전트용 Windows PC 조작 도구(웹·데스크톱·메신저 백업) 공개 패키지의 WSL 보조 실행 파일입니다.
+# Windows에서는 node scripts\cu.mjs를 직접 사용합니다.
 # 일반 사용자는 이 파일을 직접 실행하지 않고 1_백업_시작.bat를 더블클릭합니다.
 set -euo pipefail
 
@@ -9,7 +10,7 @@ load_computer_use_path_config "$SELF_WSL"
 
 usage() {
   cat <<'EOF'
-카카오톡/위챗 백업 보조 실행 파일
+Computer-Use 보조 실행 파일 (AI 에이전트용 Windows PC 조작 도구, WSL용)
 
 일반 사용자는 압축을 푼 폴더의 1_백업_시작.bat를 더블클릭하세요.
 이 파일은 Windows Node.js를 사용할 수 없고 WSL 대체 실행이 필요한 경우에만 내부적으로 사용됩니다.
@@ -17,7 +18,8 @@ usage() {
 지원 항목:
   cu gui
   cu doctor
-  cu web pages|goto|read|find|click|clicktext|type|select|check|upload|validate|identify|assert|shot
+  cu web pages|goto|read|find|click|clicktext|type|select|check|upload|validate|identify|assert|shot|script ...
+  cu windows|see|tree|read|find|click|type|key|clicktext|vassert|snapshot ...   (전체: node scripts/cu.mjs help)
   cu browser login-check|scrape|run|audit
   cu wechat run|batch|audit|db|validate-db|reaudit|review-queue
   cu kakao chat|chat-batch|chat-audit|openchat|audit|view
@@ -37,23 +39,12 @@ case "$cmd" in
     node "$SELF_WSL/doctor.mjs" "$@"
     ;;
   web)
-    action="${1:-pages}"
-    shift || true
-    weburl=""
-    webport="$CU_CHROME_CDP_PORT"
-    pos=()
-    while [ $# -gt 0 ]; do
-      case "$1" in
-        --url) weburl="${2:-}"; shift 2 ;;
-        --port) webport="${2:-$CU_CHROME_CDP_PORT}"; shift 2 ;;
-        *) pos+=("$1"); shift ;;
-      esac
-    done
-    a1="${pos[0]:-}"
-    a2="${pos[1]:-}"
-    web_args=(-Action "$action" -Arg1 "$a1" -Arg2 "$a2" -Port "$webport" -RunnerPath "$CU_WEB_CDP_SCRIPT" -EvidenceOut "$CU_SHOTS_DIR_WIN\\web_last.png")
-    [ -n "$weburl" ] && web_args+=(-Url "$weburl")
-    powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File "$CU_SCRIPTS_DIR_WIN\\cu_web.ps1" "${web_args[@]}"
+    # Windows Chrome 웹 자동화. node scripts/cu.mjs가 요청 파일로 cu_web.ps1을 호출한다(한글·따옴표 안전).
+    node "$SELF_WSL/cu.mjs" web "$@"
+    ;;
+  windows|fg|front|show|see|screen|ocr|tree|read|find|assert|click|invoke|toggle|focus|settext|clicktext|clickrel|vassert|type|key|scroll|wait|children|gettext|vscroll|snapshot|stop|resume|status)
+    # 모든 Windows 앱 조작(UIA·창 핸들·글자 인식). 결과는 JSON 한 줄이다.
+    node "$SELF_WSL/cu.mjs" "$cmd" "$@"
     ;;
   browser|browser-workflow)
     node "$SELF_WSL/browser_workflow.mjs" "$@"

@@ -81,10 +81,17 @@ const requiredFiles = [
   'scripts/start_console.ps1',
   'scripts/computer_use_console_server.mjs',
   'scripts/chat_artifact_viewer_server.mjs',
+  'scripts/cu.mjs',
+  'scripts/win32.ps1',
+  'scripts/uia.ps1',
   'scripts/browser_workflow.mjs',
   'scripts/chrome_cdp_runner.mjs',
+  'scripts/chrome_profiles.ps1',
   'scripts/cu_web.ps1',
   'scripts/ensure_windows_chrome_cdp.ps1',
+  'scripts/lib/web_helpers.mjs',
+  'scripts/lib/web_client.mjs',
+  'scripts/lib/chrome_profiles.ps1',
   'scripts/wechat_windows_backup.mjs',
   'scripts/wechat_windows_batch.mjs',
   'scripts/kakao_regular_chat.mjs',
@@ -113,6 +120,26 @@ function capability({ id, label, files, command, foreground = true, writes = tru
 }
 
 const capabilities = [
+  capability({
+    id: 'agent-cli',
+    label: 'AI 에이전트 통합 명령(웹·데스크톱 관찰·조작·검증)',
+    files: ['scripts/cu.mjs', 'scripts/win32.ps1', 'scripts/uia.ps1', 'scripts/cu_web.ps1', 'scripts/chrome_cdp_runner.mjs', 'scripts/lib/web_helpers.mjs'],
+    command: 'node .\\scripts\\cu.mjs help',
+    foreground: false,
+    writes: false,
+  }),
+  capability({
+    id: 'desktop-control',
+    label: '모든 Windows 앱 창 찾기·캡처·UIA·글자 인식·입력',
+    files: ['scripts/cu.mjs', 'scripts/win32.ps1', 'scripts/uia.ps1', 'scripts/ocr_lines.ps1', 'scripts/capture_screen.ps1'],
+    command: 'node .\\scripts\\cu.mjs windows',
+  }),
+  capability({
+    id: 'web-automation',
+    label: '보이는 Windows Chrome 웹 작업(계정별 프로필·스니펫·검증)',
+    files: ['scripts/cu.mjs', 'scripts/cu_web.ps1', 'scripts/chrome_cdp_runner.mjs', 'scripts/lib/web_helpers.mjs', 'scripts/lib/chrome_profiles.ps1', 'scripts/chrome_profiles.ps1'],
+    command: 'node .\\scripts\\cu.mjs web pages',
+  }),
   capability({
     id: 'project-diagnostics',
     label: '패키지와 준비 상태 확인',

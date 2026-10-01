@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import { createServer } from 'node:http';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
 import {
   appendJsonl,
   classifyStatus,
@@ -13,19 +12,15 @@ import {
   parseArgs,
   printSummary,
   readJson,
-  run,
   writeJson,
   toCsv,
   isoNow,
 } from './lib/cu_common.mjs';
 import { loadPathConfig, wslPathToWindows } from './lib/path_config.mjs';
+import { runWebAction } from './lib/web_client.mjs';
 
 const args = parseArgs();
 const cmd = args._[0] || 'help';
-const scriptsDir = fileURLToPath(new URL('.', import.meta.url));
-const repo = resolve(scriptsDir, '..');
-const cuScript = join(repo, 'scripts', 'cu');
-const cuWebPowerShell = join(scriptsDir, 'cu_web.ps1');
 const pathConfig = loadPathConfig();
 
 function usage() {
@@ -37,6 +32,9 @@ function usage() {
   node scripts/browser_workflow.mjs run --recipe FILE --out DIR [--confirm-browser-write]
   node scripts/browser_workflow.mjs audit DIR [--check]`);
 }
+
+// 화면이나 데이터를 바꾸는 단계. 쓰기 레시피와 --confirm-browser-write가 모두 있어야 실행한다.
+const WRITE_STEPS = new Set(['type', 'setValue', 'select', 'pick', 'check', 'uncheck', 'upload', 'click', 'clickSubmit', 'press', 'dismiss', 'download', 'script']);
 
 function rejectBroadDomains(domains) {
   if (!Array.isArray(domains) || domains.length === 0) throw new Error('recipe allowed_domains must be non-empty');
@@ -122,33 +120,28 @@ function redactStep(step) {
   return clean;
 }
 
-function cuWeb(action, ...argv) {
-  let res;
-  if (process.platform === 'win32') {
-    const positional = [];
-    let url = '';
-    let port = pathConfig.chromeCdpPort;
-    for (let index = 0; index < argv.length; index++) {
-      if (argv[index] === '--url') url = String(argv[++index] || '');
-      else if (argv[index] === '--port') port = Number(argv[++index] || pathConfig.chromeCdpPort);
-      else positional.push(String(argv[index]));
-    }
-    const powershellArgs = [
-      '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass',
-      '-File', cuWebPowerShell,
-      '-Action', action,
-      '-Arg1', positional[0] || '',
-      '-Arg2', positional[1] || '',
-      '-Port', String(port),
-    ];
-    if (url) powershellArgs.push('-Url', url);
-    res = run('powershell.exe', powershellArgs, { cwd: repo });
-  } else {
-    res = run('bash', [cuScript, 'web', action, ...argv], { cwd: repo });
-  }
-  let parsed = null;
-  try { parsed = JSON.parse((res.stdout || '').trim().split(/\r?\n/).pop() || '{}'); } catch {}
-  return { ...res, parsed };
+// Windows Chrome 러너 호출(cu_web.ps1). Windows 네이티브·WSL 모두 같은 요청 파일 방식을 쓴다.
+function cdpCall(action, positional, options = {}, { url = '', profile = '', timeoutMs = 300000 } = {}) {
+  const request = { action, arg1: positional[0] ?? '', arg2: positional[1] ?? '', options: { ...options } };
+  if (positional.length > 2) request.options.rest = positional.slice(2);
+  if (url) request.url = url;
+  if (profile) request.profile = profile;
+  return runWebAction(request, { timeoutMs, config: pathConfig });
+}
+
+// 레시피 단계의 snake_case 옵션을 러너 옵션으로 옮긴다.
+function stepOptions(step) {
+  const map = {
+    frame: 'frame', label: 'label', nth: 'nth', exact: 'exact', within: 'within', dialog: 'dialog',
+    confirm_dialog: 'confirmDialog', modal_confirm: 'modalConfirm', modal_button: 'modalButton',
+    expect_gone: 'expectGone', expect_url: 'expectUrl', idem_key: 'idemKey', mode: 'mode',
+    require_empty: 'requireEmpty', numeric: 'numeric', counter: 'counter', via: 'via', timeout: 'timeout',
+    identity: 'identity', until_url: 'untilUrl', count: 'count', state: 'state', force: 'force',
+  };
+  const options = {};
+  for (const [from, to] of Object.entries(map)) if (step[from] !== undefined) options[to] = step[from];
+  if (step.expect?.text) options.expect = step.expect.text;
+  return options;
 }
 
 function cdpFilePath(file) {
@@ -159,8 +152,13 @@ function cdpFilePath(file) {
 async function executeRecipe(recipeFile, mode) {
   const recipe = loadRecipe(recipeFile);
   const driver = args.driver || recipe.driver || 'static';
+  const profile = args.profile || recipe.profile || '';
   let cdpTarget = new URL(recipe.start_url).hostname;
-  const cdp = (action, ...argv) => cuWeb(action, ...argv, '--url', cdpTarget);
+  // cdp('동작', 인자..., {옵션})
+  const cdp = (action, ...argv) => {
+    const options = argv.length && argv.at(-1) && typeof argv.at(-1) === 'object' ? argv.pop() : {};
+    return cdpCall(action, argv, options, { url: cdpTarget, profile, timeoutMs: action === 'handoff' ? Number(options.timeout || 600000) + 120000 : 300000 });
+  };
   const outDir = resolve(args.out || defaultRunDir('browser', 'shots'));
   ensureDir(outDir);
   ensureDir(join(outDir, 'extracted'));
@@ -186,7 +184,8 @@ async function executeRecipe(recipeFile, mode) {
     const safeStep = redactStep(step);
     let ok = true;
     let message = '';
-    if (['type', 'select', 'check', 'upload', 'click', 'clickSubmit'].includes(step.action)) {
+    const opts = stepOptions(step);
+    if (WRITE_STEPS.has(step.action)) {
       if (!args['confirm-browser-write'] || recipe.mode === 'read_only') {
         ok = false;
         message = `write action rejected without explicit non-read-only recipe and --confirm-browser-write: ${step.id || step.action}`;
@@ -195,58 +194,45 @@ async function executeRecipe(recipeFile, mode) {
         ok = false;
         message = `write action requires --driver cdp: ${step.id || step.action}`;
         issues.push({ severity: 'fail', message });
-      } else if (step.action === 'type') {
-        const r = cdp('type', step.selector || '', step.value || '');
-        ok = r.ok;
-        message = ok ? 'cdp type ok' : `cdp type failed: ${r.stderr || r.stdout}`;
-        if (!ok) issues.push({ severity: 'fail', message });
-      } else if (step.action === 'select') {
-        const r = cdp('select', step.selector || '', step.value || step.text || '');
-        ok = r.ok && r.parsed?.ok !== false;
-        message = ok ? 'cdp select ok' : `cdp select failed: ${r.stderr || r.stdout}`;
-        if (!ok) issues.push({ severity: 'fail', message });
-      } else if (step.action === 'check') {
-        const r = cdp('check', step.selector || '');
-        ok = r.ok;
-        message = ok ? 'cdp check ok' : `cdp check failed: ${r.stderr || r.stdout}`;
-        if (!ok) issues.push({ severity: 'fail', message });
-      } else if (step.action === 'upload') {
-        const r = cdp('upload', step.selector || '', cdpFilePath(step.value || ''));
-        ok = r.ok;
-        message = ok ? 'cdp upload ok' : `cdp upload failed: ${r.stderr || r.stdout}`;
-        if (!ok) issues.push({ severity: 'fail', message });
-      } else if (step.action === 'click') {
-        if (!step.selector && !step.text) {
-          ok = false;
-          message = 'click requires selector or text';
-          issues.push({ severity: 'fail', message });
-        } else {
-          const r = step.selector ? cdp('click', step.selector) : cdp('clicktext', step.text);
-          ok = r.ok;
-          if (ok && r.parsed?.url) {
+      } else {
+        let r = null;
+        if (step.action === 'type') r = cdp('type', step.selector || '', step.value || '', opts);
+        else if (step.action === 'setValue') r = cdp('setvalue', step.selector || '', step.value || '', opts);
+        else if (step.action === 'select') r = cdp('select', step.selector || '', step.value || step.text || '', opts);
+        else if (step.action === 'pick') r = cdp('pick', step.selector || '', step.value || step.text || '', opts);
+        else if (step.action === 'check') r = cdp('check', step.selector || '', opts);
+        else if (step.action === 'uncheck') r = cdp('uncheck', step.selector || '', opts);
+        else if (step.action === 'upload') r = cdp('upload', step.selector || '', ...[].concat(step.value || step.files || []).map(cdpFilePath), opts);
+        else if (step.action === 'press') r = cdp('press', step.key || step.text || '', { ...opts, ...(step.selector ? { selector: step.selector } : {}) });
+        else if (step.action === 'dismiss') r = cdp('dismiss', opts);
+        else if (step.action === 'download') {
+          const target = cdpFilePath(join(outDir, 'downloads', step.out || `${step.id || 'download'}`));
+          r = cdp('download', step.url || '', { ...opts, ...(step.selector ? { click: step.selector } : {}), ...(step.text ? { clicktext: step.text } : {}), out: target });
+        } else if (step.action === 'script') {
+          r = cdp('script', cdpFilePath(resolve(dirname(recipeFile), step.file || '')), ...(step.args || []).map(String), { ...opts, write: step.writes !== false });
+        } else if (step.action === 'click') {
+          if (!step.selector && !step.text) r = { ok: false, parsed: { error: 'click requires selector or text' } };
+          else r = step.selector ? cdp('click', step.selector, opts) : cdp('clicktext', step.text, opts);
+        } else if (step.action === 'clickSubmit') {
+          const validation = cdp('validate', step.selector || '', { frame: opts.frame });
+          if (!validation.ok || validation.parsed?.ok === false) {
+            const invalidCount = Number(validation.parsed?.invalid?.length || 0);
+            const maxlengthCount = Number(validation.parsed?.maxlength?.length || 0);
+            r = { ok: false, parsed: { error: `submit blocked by live form validation: invalid=${invalidCount}, maxlength=${maxlengthCount}` } };
+          } else {
+            r = cdp('click', step.selector || '', opts);
+          }
+        }
+        ok = Boolean(r?.ok) && r?.parsed?.ok !== false;
+        if (ok && r.parsed?.url) {
+          try {
             page.url = r.parsed.url;
             cdpTarget = new URL(page.url).hostname;
-          }
-          message = ok ? 'cdp click ok' : `cdp click failed: ${r.stderr || r.stdout}`;
-          if (!ok) issues.push({ severity: 'fail', message });
+          } catch {}
         }
-      } else if (step.action === 'clickSubmit') {
-        const validation = cdp('validate', step.selector || '');
-        if (!validation.ok || validation.parsed?.ok === false) {
-          ok = false;
-          const invalidCount = Number(validation.parsed?.invalid?.length || 0);
-          const maxlengthCount = Number(validation.parsed?.maxlength?.length || 0);
-          message = `submit blocked by live form validation: invalid=${invalidCount}, maxlength=${maxlengthCount}`;
-        } else {
-          const r = cdp('click', step.selector || '');
-          ok = r.ok;
-          if (ok && r.parsed?.url) {
-            page.url = r.parsed.url;
-            cdpTarget = new URL(page.url).hostname;
-          }
-          message = ok ? 'cdp clickSubmit ok' : `cdp clickSubmit failed: ${r.stderr || r.stdout}`;
-        }
+        message = ok ? `cdp ${step.action} ok${r.parsed?.outcome ? ` (${r.parsed.outcome})` : ''}` : `cdp ${step.action} failed: ${r?.parsed?.error || r?.stderr || r?.stdout || ''}`.slice(0, 600);
         if (!ok) issues.push({ severity: 'fail', message });
+        else if (r.parsed?.outcome === 'unknown') issues.push({ severity: 'review', message: `${step.id || step.action}: 결과 불명 — ${r.parsed.hint || '반영 여부를 다시 확인하세요'}` });
       }
     } else if (step.action === 'goto') {
       if (!urlAllowed(step.url || recipe.start_url, recipe.allowed_domains)) {
@@ -281,6 +267,35 @@ async function executeRecipe(recipeFile, mode) {
         page = await fetchPage(page.url);
         ok = page.ok;
         message = ok ? 'static reload ok' : `static reload failed: HTTP ${page.status}`;
+      }
+      if (!ok) issues.push({ severity: 'fail', message });
+    } else if (step.action === 'hover' || step.action === 'scroll' || step.action === 'waitSelector') {
+      if (driver !== 'cdp') {
+        ok = false;
+        message = `${step.action} requires --driver cdp`;
+      } else {
+        const r = step.action === 'hover'
+          ? (step.selector ? cdp('hover', step.selector, opts) : cdp('hover', { ...opts, text: step.text || '' }))
+          : (step.action === 'scroll'
+            ? cdp('scroll', step.direction || 'down', { ...opts, ...(step.selector ? { selector: step.selector } : {}), ...(step.until_text ? { untilText: step.until_text } : {}) })
+            : cdp('waitsel', step.selector || '', opts));
+        ok = r.ok;
+        message = ok ? `cdp ${step.action} ok` : `cdp ${step.action} failed: ${r.parsed?.error || r.stderr || r.stdout}`.slice(0, 600);
+      }
+      if (!ok) issues.push({ severity: 'fail', message });
+    } else if (step.action === 'session' || step.action === 'handoff') {
+      if (driver !== 'cdp') {
+        ok = false;
+        message = `${step.action} requires --driver cdp`;
+      } else if (step.action === 'session') {
+        const r = cdp('session', step.identity || '', opts);
+        const status = r.parsed?.status || 'UNKNOWN';
+        ok = step.identity ? status === 'LOGGED_IN' : status !== 'LOGIN_WALL';
+        message = ok ? `session ${status}` : `session not ready: ${status}. 사람이 로그인한 뒤 handoff 단계로 이어서 진행합니다.`;
+      } else {
+        const r = cdp('handoff', step.reason || '', { ...opts, timeout: Number(step.timeout || 600000) });
+        ok = r.ok;
+        message = ok ? `handoff done after ${r.parsed?.waitedMs ?? 0}ms` : `handoff failed: ${r.parsed?.error || r.stderr || r.stdout}`.slice(0, 600);
       }
       if (!ok) issues.push({ severity: 'fail', message });
     } else if (step.action === 'validate') {
@@ -404,6 +419,33 @@ async function executeRecipe(recipeFile, mode) {
       writeJson(join(outDir, 'extracted', `${ex.id}.json`), table);
       writeFileSync(join(outDir, 'extracted', `${ex.id}.csv`), toCsv(table), 'utf8');
       if (ex.expect_nonzero && table.length === 0) issues.push({ severity: 'review', message: `extracted table has zero rows: ${ex.id}` });
+    } else if (ex.type === 'fetch') {
+      if (driver !== 'cdp') {
+        issues.push({ severity: 'fail', message: `fetch extract requires --driver cdp: ${ex.id}` });
+        continue;
+      }
+      const absolute = new URL(ex.url || '', page.url).href;
+      if (!urlAllowed(absolute, recipe.allowed_domains)) {
+        issues.push({ severity: 'fail', message: `fetch extract outside allowlist: ${ex.id}` });
+        continue;
+      }
+      const r = cdp('fetch', absolute, { out: cdpFilePath(join(outDir, 'extracted', `${ex.id}.response.json`)) });
+      extracted[ex.id] = r.parsed?.json ?? null;
+      writeJson(join(outDir, 'extracted', `${ex.id}.json`), extracted[ex.id]);
+      if (!r.ok || r.parsed?.loginSuspected) issues.push({ severity: 'fail', message: `fetch extract failed or login required: ${ex.id} (HTTP ${r.parsed?.status ?? '?'})` });
+      continue;
+    } else if (ex.type === 'collect') {
+      if (driver !== 'cdp') {
+        issues.push({ severity: 'fail', message: `collect extract requires --driver cdp: ${ex.id}` });
+        continue;
+      }
+      const fieldList = Object.entries(ex.fields || {}).map(([name, spec]) => `${name}=${spec}`);
+      const r = cdp('collect', ex.item || '', { field: fieldList, ...(ex.key ? { key: ex.key } : {}), ...(ex.container ? { selector: ex.container } : {}), maxSteps: Number(ex.max_steps || 40), out: cdpFilePath(join(outDir, 'extracted', `${ex.id}.json`)) });
+      extracted[ex.id] = { count: r.parsed?.count ?? 0, reachedEnd: r.parsed?.reachedEnd ?? false };
+      if (!r.ok) issues.push({ severity: 'fail', message: `collect extract failed: ${ex.id}: ${r.parsed?.error || r.stderr}`.slice(0, 400) });
+      else if (ex.expect_nonzero && !r.parsed?.count) issues.push({ severity: 'review', message: `collected zero items: ${ex.id}` });
+      else if (!r.parsed?.reachedEnd) issues.push({ severity: 'review', message: `collect stopped before list end: ${ex.id}` });
+      continue;
     } else if (ex.type === 'links') {
       let links;
       if (driver === 'cdp') {
@@ -455,20 +497,20 @@ try {
   if (cmd === 'help' || args.help) {
     usage();
   } else if (cmd === 'doctor') {
-    const res = run('bash', [cuScript, 'web', 'pages'], { cwd: repo });
-    let parsed = {};
-    try { parsed = JSON.parse((res.stdout || '').trim().split(/\r?\n/u).pop() || '{}'); } catch {}
+    const res = cdpCall('pages', [], {}, { profile: args.profile || '' });
     printSummary({
       schema: 'browser.doctor.v1',
-      status: res.ok && parsed.ok ? 'PASS' : 'FAIL',
+      status: res.ok ? 'PASS' : 'FAIL',
       node: process.version,
       windows_chrome_auto_start: true,
-      cdp_port: parsed.port || null,
-      pages: parsed.count || 0,
+      profile: args.profile || 'default',
+      cdp_port: res.parsed?.port || null,
+      pages: res.parsed?.count || 0,
+      ...(res.ok ? {} : { error: res.parsed?.error || res.stderr.trim().slice(0, 300) }),
     });
-    if (!res.ok || !parsed.ok) process.exitCode = 1;
+    if (!res.ok) process.exitCode = 1;
   } else if (cmd === 'pages') {
-    const res = run('bash', [cuScript, 'web', 'pages'], { cwd: repo });
+    const res = cdpCall('pages', [], {}, { profile: args.profile || '' });
     process.stdout.write(res.stdout || res.stderr);
     process.exit(res.status || 0);
   } else if (['login-check', 'scrape', 'run'].includes(cmd)) {

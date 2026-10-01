@@ -1,10 +1,14 @@
-param(
+﻿param(
   [ValidateRange(1024,65535)][int]$PreferredPort = 9224,
   [string]$ProfileDir = '',
   [string]$StateFile = '',
   [string]$StartUrl = 'about:blank',
   [ValidateRange(1,100)][int]$PortScanCount = 40,
-  [ValidateRange(3,60)][int]$WaitSeconds = 20
+  [ValidateRange(3,60)][int]$WaitSeconds = 20,
+  # 이미 있는 자동화 프로필(로그인 세션 보존)을 연결할 때 쓴다. 폴더가 없으면 빈 프로필을 만들지 않고 멈춘다.
+  [switch]$RequireExisting,
+  # 프로젝트 밖 프로필은 사람이 쓰던 창일 수 있어 강제 종료하지 않는다.
+  [switch]$NoKill
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,6 +16,7 @@ $ErrorActionPreference = 'Stop'
 $OutputEncoding = [Console]::OutputEncoding
 
 . (Join-Path $PSScriptRoot 'lib\path_config.ps1')
+. (Join-Path $PSScriptRoot 'lib\chrome_profiles.ps1')
 $cuConfig = Get-ComputerUseConfig
 if ([string]::IsNullOrWhiteSpace($ProfileDir)) {
   $ProfileDir = Join-Path $cuConfig.stateDirWin 'chrome-cdp-profile'
@@ -23,8 +28,14 @@ $startUri = $null
 $validHttpUrl = [Uri]::TryCreate($StartUrl, [UriKind]::Absolute, [ref]$startUri) -and $startUri.Scheme -in @('http','https')
 if ($StartUrl -ne 'about:blank' -and -not $validHttpUrl) { $StartUrl = 'about:blank' }
 
-$ProfileDir = [System.IO.Path]::GetFullPath($ProfileDir)
+$ProfileDir = [System.IO.Path]::GetFullPath($ProfileDir).TrimEnd('\')
 $StateFile = [System.IO.Path]::GetFullPath($StateFile)
+if (Test-IsNormalBrowserProfile $ProfileDir) {
+  throw "사용자의 일반 Chrome·Edge 프로필은 자동화에 쓰지 않습니다. 전용 프로필 폴더를 지정하세요: $ProfileDir"
+}
+if ($RequireExisting -and -not (Test-Path -LiteralPath $ProfileDir -PathType Container)) {
+  throw "연결할 프로필 폴더가 없습니다. 빈 프로필로 열면 모든 사이트가 로그아웃된 것처럼 보이므로 경로를 먼저 확인하세요: $ProfileDir"
+}
 
 function Find-ChromeExecutable {
   $candidates = New-Object 'System.Collections.Generic.List[string]'
@@ -81,10 +92,8 @@ function Test-TcpPort([int]$Port) {
 }
 
 function Get-ProfileChromeProcesses {
-  $needle = $ProfileDir.TrimEnd('\')
   return @(Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" -ErrorAction SilentlyContinue | Where-Object {
-    $line = [string]$_.CommandLine
-    $line -and $line.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+    Test-CommandLineUsesProfile ([string]$_.CommandLine) $ProfileDir
   })
 }
 
@@ -173,7 +182,11 @@ if ($launchPort -le 0) {
 }
 
 # 오래된 전용 프로필 프로세스만 새 연결을 막을 수 있다. 일반 Chrome 프로필은 종료하지 않는다.
-foreach ($process in Get-ProfileChromeProcesses) {
+$staleProcesses = @(Get-ProfileChromeProcesses)
+if ($NoKill -and $staleProcesses.Count -gt 0) {
+  throw "이 프로필의 Chrome이 자동화 연결 없이 열려 있습니다. 작업 중인 내용을 저장하고 그 Chrome 창을 직접 닫은 뒤 다시 실행하세요: $ProfileDir"
+}
+foreach ($process in $staleProcesses) {
   try { Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction SilentlyContinue } catch {}
 }
 Start-Sleep -Milliseconds 400
